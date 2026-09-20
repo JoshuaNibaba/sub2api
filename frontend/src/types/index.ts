@@ -84,7 +84,8 @@ export interface User {
   linuxdo_bound?: boolean
   oidc_bound?: boolean
   wechat_bound?: boolean
-  role: 'admin' | 'user' // User role for authorization
+  role: 'super_admin' | 'admin' | 'user' | 'enterprise_user' // User role for authorization
+  permissions?: string[] // Effective capabilities derived from the role
   balance: number // User balance for API usage
   frozen_balance?: number // Balance currently held by async batch jobs
   concurrency: number // Allowed concurrent requests

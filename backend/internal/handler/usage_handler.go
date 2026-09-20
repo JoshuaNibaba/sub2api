@@ -262,6 +262,18 @@ func (h *UsageHandler) List(c *gin.Context) {
 // ListErrors handles listing the current user's failed requests (redacted).
 // GET /api/v1/usage/errors
 func (h *UsageHandler) ListErrors(c *gin.Context) {
+	h.listErrors(c, true)
+}
+
+// ListEnterpriseErrors lists the current enterprise user's own redacted
+// errors. Its explicit enterprise permission replaces the general user-facing
+// feature switch, while ownership scoping and response redaction remain the
+// same as ListErrors.
+func (h *UsageHandler) ListEnterpriseErrors(c *gin.Context) {
+	h.listErrors(c, false)
+}
+
+func (h *UsageHandler) listErrors(c *gin.Context, requireUserVisibilitySetting bool) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")
@@ -269,7 +281,7 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 	}
 
 	// Visibility switch (fail-closed). Defense-in-depth: frontend also hides the tab.
-	if h.settingService == nil || !h.settingService.IsUserErrorViewAllowed(c.Request.Context()) {
+	if requireUserVisibilitySetting && (h.settingService == nil || !h.settingService.IsUserErrorViewAllowed(c.Request.Context())) {
 		response.Forbidden(c, "Error requests view is disabled")
 		return
 	}

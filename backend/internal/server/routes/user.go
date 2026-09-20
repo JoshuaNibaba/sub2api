@@ -25,6 +25,21 @@ func RegisterUserRoutes(
 	// 用户管理面变更类操作入审计（含 TOTP 启用/禁用、step-up 验证、密码修改等安全事件）
 	authenticated.Use(gin.HandlerFunc(auditLog))
 	{
+		// Enterprise read-only views deliberately live outside /admin. The
+		// permission middleware is the server-side source of truth; frontend
+		// visibility is only a convenience.
+		if h != nil {
+			enterprise := authenticated.Group("/enterprise")
+			enterprise.Use(panelRateLimiter.Heavy())
+			if h.Admin != nil && h.Admin.Account != nil {
+				enterprise.GET("/account-pool", middleware.RequirePermission(service.PermissionEnterpriseAccountPool), h.Admin.Account.EnterprisePool)
+			}
+			if h.Usage != nil {
+				enterprise.GET("/usage-logs", middleware.RequirePermission(service.PermissionEnterpriseUsage), h.Usage.List)
+				enterprise.GET("/error-logs", middleware.RequirePermission(service.PermissionEnterpriseLogs), h.Usage.ListEnterpriseErrors)
+			}
+		}
+
 		// 用户接口
 		user := authenticated.Group("/user")
 		{

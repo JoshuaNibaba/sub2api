@@ -25,6 +25,7 @@ func RegisterAdminRoutes(
 
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
+	admin.Use(middleware.RequirePermission(service.PermissionAdminPanel))
 	// 面板全局按用户限流（默认管理员豁免，可在系统设置中关闭豁免）
 	admin.Use(panelRateLimiter.Global())
 	// 审计中间件挂在认证之后：所有管理面变更类操作 + 敏感读取入审计日志
@@ -135,6 +136,7 @@ func RegisterAdminRoutes(
 
 func registerPromptAuditRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	promptAudit := admin.Group("/prompt-audit")
+	promptAudit.Use(middleware.RequireReadWritePermission(service.PermissionAdminSecurityRead, service.PermissionAdminSecurityWrite))
 	{
 		promptAudit.GET("/config", h.Admin.PromptAudit.GetConfig)
 		promptAudit.PUT("/config", h.Admin.PromptAudit.UpdateConfig)
@@ -151,6 +153,7 @@ func registerPromptAuditRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerAuditLogRoutes(admin *gin.RouterGroup, h *handler.Handlers, _ middleware.StepUpAuthMiddleware) {
 	auditLogs := admin.Group("/audit-logs")
+	auditLogs.Use(middleware.RequireReadWritePermission(service.PermissionAdminAuditRead, service.PermissionAdminAuditWrite))
 	{
 		auditLogs.GET("", h.Admin.AuditLog.List)
 		auditLogs.GET("/:id", h.Admin.AuditLog.Get)
@@ -169,6 +172,7 @@ func registerAdminComplianceRoutes(admin *gin.RouterGroup, h *handler.Handlers) 
 
 func registerContentModerationRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	risk := admin.Group("/risk-control")
+	risk.Use(middleware.RequireReadWritePermission(service.PermissionAdminSecurityRead, service.PermissionAdminSecurityWrite))
 	{
 		risk.GET("/config", h.Admin.ContentModeration.GetConfig)
 		risk.PUT("/config", h.Admin.ContentModeration.UpdateConfig)
@@ -183,6 +187,7 @@ func registerContentModerationRoutes(admin *gin.RouterGroup, h *handler.Handlers
 
 func registerAdminAPIKeyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	apiKeys := admin.Group("/api-keys")
+	apiKeys.Use(middleware.RequireReadWritePermission(service.PermissionAdminSettingsRead, service.PermissionAdminSettingsWrite))
 	{
 		apiKeys.PUT("/:id", h.Admin.APIKey.UpdateGroup)
 	}
@@ -190,6 +195,7 @@ func registerAdminAPIKeyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	ops := admin.Group("/ops")
+	ops.Use(middleware.RequireReadWritePermission(service.PermissionAdminOpsRead, service.PermissionAdminOpsWrite))
 	{
 		// Realtime ops signals
 		ops.GET("/concurrency", h.Admin.Ops.GetConcurrencyStats)
@@ -280,6 +286,7 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	dashboard := admin.Group("/dashboard")
+	dashboard.Use(middleware.RequirePermission(service.PermissionAdminDashboardRead))
 	{
 		dashboard.GET("/snapshot-v2", h.Admin.Dashboard.GetSnapshotV2)
 		dashboard.GET("/stats", h.Admin.Dashboard.GetStats)
@@ -299,6 +306,7 @@ func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	users := admin.Group("/users")
+	users.Use(middleware.RequireReadWritePermission(service.PermissionAdminUsersRead, service.PermissionAdminUsersWrite))
 	{
 		users.GET("", h.Admin.User.List)
 		users.GET("/:id", h.Admin.User.GetByID)
@@ -326,6 +334,7 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	groups := admin.Group("/groups")
+	groups.Use(middleware.RequireReadWritePermission(service.PermissionAdminGroupsRead, service.PermissionAdminGroupsWrite))
 	{
 		groups.GET("", h.Admin.Group.List)
 		groups.GET("/all", h.Admin.Group.GetAll)
@@ -356,6 +365,7 @@ func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	accounts := admin.Group("/accounts")
+	accounts.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminAccountsWrite))
 	{
 		accounts.GET("", h.Admin.Account.List)
 		accounts.GET("/upstream-billing-rates", h.Admin.Account.GetUpstreamBillingRates)
@@ -432,6 +442,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 
 func registerAnnouncementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	announcements := admin.Group("/announcements")
+	announcements.Use(middleware.RequireReadWritePermission(service.PermissionAdminSettingsRead, service.PermissionAdminSettingsWrite))
 	{
 		announcements.GET("", h.Admin.Announcement.List)
 		announcements.POST("", h.Admin.Announcement.Create)
@@ -444,6 +455,7 @@ func registerAnnouncementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerOpenAIOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	openai := admin.Group("/openai")
+	openai.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
 	{
 		openai.POST("/generate-auth-url", h.Admin.OpenAIOAuth.GenerateAuthURL)
 		openai.POST("/exchange-code", h.Admin.OpenAIOAuth.ExchangeCode)
@@ -459,6 +471,7 @@ func registerOpenAIOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerGeminiOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	gemini := admin.Group("/gemini")
+	gemini.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
 	{
 		gemini.POST("/oauth/auth-url", h.Admin.GeminiOAuth.GenerateAuthURL)
 		gemini.POST("/oauth/exchange-code", h.Admin.GeminiOAuth.ExchangeCode)
@@ -468,6 +481,7 @@ func registerGeminiOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerAntigravityOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	antigravity := admin.Group("/antigravity")
+	antigravity.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
 	{
 		antigravity.POST("/oauth/auth-url", h.Admin.AntigravityOAuth.GenerateAuthURL)
 		antigravity.POST("/oauth/exchange-code", h.Admin.AntigravityOAuth.ExchangeCode)
@@ -477,6 +491,7 @@ func registerAntigravityOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers)
 
 func registerGrokOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	grok := admin.Group("/grok")
+	grok.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
 	{
 		grok.GET("/oauth/capabilities", h.Admin.GrokOAuth.GetCapabilities)
 		grok.POST("/oauth/auth-url", h.Admin.GrokOAuth.GenerateAuthURL)
@@ -497,6 +512,7 @@ func registerGrokOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 // registerCNProviderRoutes 注册国产供应商（kimi/zhipu/deepseek）的额度与余额查询端点。
 func registerCNProviderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	cn := admin.Group("/cn-providers")
+	cn.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
 	{
 		// Coding Plan 滚动窗口用量（kimi/zhipu coding 账号）。
 		cn.GET("/accounts/:id/quota", h.Admin.CNProvider.QueryQuota)
@@ -507,6 +523,7 @@ func registerCNProviderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	proxies := admin.Group("/proxies")
+	proxies.Use(middleware.RequireReadWritePermission(service.PermissionAdminProxiesRead, service.PermissionAdminProxiesWrite))
 	{
 		proxies.GET("", h.Admin.Proxy.List)
 		proxies.GET("/all", h.Admin.Proxy.GetAll)
@@ -528,6 +545,7 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth
 
 func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	codes := admin.Group("/redeem-codes")
+	codes.Use(middleware.RequireReadWritePermission(service.PermissionAdminPaymentRead, service.PermissionAdminPaymentWrite))
 	{
 		codes.GET("", h.Admin.Redeem.List)
 		codes.GET("/stats", h.Admin.Redeem.GetStats)
@@ -544,6 +562,7 @@ func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	promoCodes := admin.Group("/promo-codes")
+	promoCodes.Use(middleware.RequireReadWritePermission(service.PermissionAdminPaymentRead, service.PermissionAdminPaymentWrite))
 	{
 		promoCodes.GET("", h.Admin.Promo.List)
 		promoCodes.GET("/:id", h.Admin.Promo.GetByID)
@@ -556,6 +575,7 @@ func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	adminSettings := admin.Group("/settings")
+	adminSettings.Use(middleware.RequireReadWritePermission(service.PermissionAdminSettingsRead, service.PermissionAdminSettingsWrite))
 	{
 		adminSettings.GET("", h.Admin.Setting.GetSettings)
 		adminSettings.PUT("", h.Admin.Setting.UpdateSettings)
@@ -601,6 +621,7 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerDataManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	dataManagement := admin.Group("/data-management")
+	dataManagement.Use(middleware.RequireReadWritePermission(service.PermissionAdminSettingsRead, service.PermissionAdminSystemWrite))
 	{
 		dataManagement.GET("/agent/health", h.Admin.DataManagement.GetAgentHealth)
 		dataManagement.GET("/config", h.Admin.DataManagement.GetConfig)
@@ -625,6 +646,7 @@ func registerDataManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers, s
 
 func registerBackupRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	backup := admin.Group("/backups")
+	backup.Use(middleware.RequireReadWritePermission(service.PermissionAdminSettingsRead, service.PermissionAdminSystemWrite))
 	{
 		// S3 存储配置
 		backup.GET("/s3-config", h.Admin.Backup.GetS3Config)
@@ -657,6 +679,7 @@ func registerBackupRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAut
 
 func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	system := admin.Group("/system")
+	system.Use(middleware.RequirePermission(service.PermissionAdminSystemWrite))
 	{
 		system.GET("/version", h.Admin.System.GetVersion)
 		system.GET("/check-updates", h.Admin.System.CheckUpdates)
@@ -669,6 +692,7 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	subscriptions := admin.Group("/subscriptions")
+	subscriptions.Use(middleware.RequireReadWritePermission(service.PermissionAdminGroupsRead, service.PermissionAdminGroupsWrite))
 	{
 		subscriptions.GET("", h.Admin.Subscription.List)
 		subscriptions.GET("/:id", h.Admin.Subscription.GetByID)
@@ -692,6 +716,7 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	usage := admin.Group("/usage")
+	usage.Use(middleware.RequireReadWritePermission(service.PermissionAdminUsageRead, service.PermissionAdminUsageWrite))
 	{
 		usage.GET("", h.Admin.Usage.List)
 		usage.GET("/stats", h.Admin.Usage.Stats)
@@ -705,6 +730,7 @@ func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerUserAttributeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	attrs := admin.Group("/user-attributes")
+	attrs.Use(middleware.RequireReadWritePermission(service.PermissionAdminUsersRead, service.PermissionAdminUsersWrite))
 	{
 		attrs.GET("", h.Admin.UserAttribute.ListDefinitions)
 		attrs.POST("", h.Admin.UserAttribute.CreateDefinition)
@@ -717,6 +743,7 @@ func registerUserAttributeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerScheduledTestRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	plans := admin.Group("/scheduled-test-plans")
+	plans.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminAccountsWrite))
 	{
 		plans.POST("", h.Admin.ScheduledTest.Create)
 		plans.PUT("/:id", h.Admin.ScheduledTest.Update)
@@ -729,6 +756,7 @@ func registerScheduledTestRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerErrorPassthroughRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	rules := admin.Group("/error-passthrough-rules")
+	rules.Use(middleware.RequireReadWritePermission(service.PermissionAdminSettingsRead, service.PermissionAdminSettingsWrite))
 	{
 		rules.GET("", h.Admin.ErrorPassthrough.List)
 		rules.GET("/:id", h.Admin.ErrorPassthrough.GetByID)
@@ -740,6 +768,7 @@ func registerErrorPassthroughRoutes(admin *gin.RouterGroup, h *handler.Handlers)
 
 func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	profiles := admin.Group("/tls-fingerprint-profiles")
+	profiles.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminAccountsWrite))
 	{
 		profiles.GET("", h.Admin.TLSFingerprintProfile.List)
 		profiles.GET("/:id", h.Admin.TLSFingerprintProfile.GetByID)
@@ -751,6 +780,7 @@ func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Hand
 
 func registerPluginRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	plugins := admin.Group("/plugins")
+	plugins.Use(middleware.RequirePermission(service.PermissionAdminPluginsWrite))
 	{
 		plugins.GET("", h.Admin.Plugin.List)
 		plugins.GET("/:id", h.Admin.Plugin.Get)
@@ -768,6 +798,7 @@ func registerPluginRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAut
 
 func registerChannelRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	channels := admin.Group("/channels")
+	channels.Use(middleware.RequireReadWritePermission(service.PermissionAdminGroupsRead, service.PermissionAdminGroupsWrite))
 	{
 		channels.GET("", h.Admin.Channel.List)
 		channels.GET("/model-pricing", h.Admin.Channel.GetModelDefaultPricing)
@@ -782,6 +813,7 @@ func registerChannelRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 func registerChannelMonitorRoutes(admin *gin.RouterGroup, h *handler.Handlers, settingService *service.SettingService) {
 	guard := channelMonitorAdminFeatureGuard(settingService)
 	monitors := admin.Group("/channel-monitors")
+	monitors.Use(middleware.RequireReadWritePermission(service.PermissionAdminOpsRead, service.PermissionAdminSecurityWrite))
 	monitors.Use(guard)
 	{
 		monitors.GET("", h.Admin.ChannelMonitor.List)
@@ -795,6 +827,7 @@ func registerChannelMonitorRoutes(admin *gin.RouterGroup, h *handler.Handlers, s
 	}
 
 	templates := admin.Group("/channel-monitor-templates")
+	templates.Use(middleware.RequireReadWritePermission(service.PermissionAdminOpsRead, service.PermissionAdminSecurityWrite))
 	templates.Use(guard)
 	{
 		templates.GET("", h.Admin.ChannelMonitorTemplate.List)
@@ -810,6 +843,7 @@ func registerChannelMonitorRoutes(admin *gin.RouterGroup, h *handler.Handlers, s
 // registerAffiliateRoutes 注册邀请返利的管理端路由（专属用户配置）
 func registerAffiliateRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	affiliates := admin.Group("/affiliates")
+	affiliates.Use(middleware.RequireReadWritePermission(service.PermissionAdminUsersRead, service.PermissionAdminUsersWrite))
 	{
 		affiliates.GET("/invites", h.Admin.Affiliate.ListInviteRecords)
 		affiliates.GET("/rebates", h.Admin.Affiliate.ListRebateRecords)
@@ -834,6 +868,7 @@ func registerChannelMonitorV2Routes(admin *gin.RouterGroup, h *handler.Handlers,
 	modeV2Guard := channelMonitorModeV2Guard(settingService)
 
 	monitor := admin.Group("/channel-monitor-v2")
+	monitor.Use(middleware.RequirePermission(service.PermissionAdminOpsRead))
 	{
 		config := monitor.Group("")
 		config.Use(featureGuard)

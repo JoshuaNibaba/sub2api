@@ -16,8 +16,9 @@ func AdminOnly() gin.HandlerFunc {
 			return
 		}
 
-		// 检查是否为管理员
-		if role != service.RoleAdmin {
+		// 检查是否为管理员（超级管理员和受限管理员均可进入面板，
+		// 具体操作权限由 RequirePermission 在路由层进一步判断）。
+		if !service.IsStaffRole(role) {
 			AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
 			return
 		}

@@ -24,8 +24,8 @@
                 <h2 class="truncate text-2xl font-semibold text-gray-900 dark:text-white">
                   {{ displayName }}
                 </h2>
-                <span :class="['badge', user?.role === 'admin' ? 'badge-primary' : 'badge-gray']">
-                  {{ user?.role === 'admin' ? t('profile.administrator') : t('profile.user') }}
+                <span :class="['badge', isStaffRole(user?.role) ? 'badge-primary' : user?.role === 'enterprise_user' ? 'badge-success' : 'badge-gray']">
+                  {{ isStaffRole(user?.role) ? t('profile.administrator') : user?.role === 'enterprise_user' ? t('profile.enterpriseUser') : t('profile.user') }}
                 </span>
                 <span
                   :class="['badge', user?.status === 'active' ? 'badge-success' : 'badge-danger']"
@@ -183,6 +183,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import { isStaffRole } from '@/utils/permissions'
 import ProfileAvatarCard from '@/components/user/profile/ProfileAvatarCard.vue'
 import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
 import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'

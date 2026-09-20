@@ -13,6 +13,7 @@ import type {
   AuthResponse,
   ActionCaptchaRequestProof
 } from '@/types'
+import { defaultPermissionsForRole } from '@/utils/permissions'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
@@ -93,8 +94,17 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   const isAdmin = computed(() => {
-    return user.value?.role === 'admin'
+    return user.value?.role === 'super_admin' || user.value?.role === 'admin'
   })
+
+  const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
+  const isEnterpriseUser = computed(() => user.value?.role === 'enterprise_user')
+  const effectivePermissions = computed(() => user.value?.permissions?.length
+    ? user.value.permissions
+    : [...defaultPermissionsForRole(user.value?.role)])
+  const hasPermission = (permission: string): boolean => {
+    return isSuperAdmin.value || effectivePermissions.value.includes(permission)
+  }
 
   const isSimpleMode = computed(() => runMode.value === 'simple')
   const hasPendingAuthSession = computed(() => pendingAuthSession.value !== null)
@@ -498,6 +508,10 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     isAuthenticated,
     isAdmin,
+    isSuperAdmin,
+    isEnterpriseUser,
+    permissions: effectivePermissions,
+    hasPermission,
     isSimpleMode,
     hasPendingAuthSession,
 
