@@ -86,6 +86,7 @@
 import { computed, ref, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
 import type { AdminUser, UserAttributeValuesMap } from '@/types'
@@ -98,13 +99,24 @@ import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
 
 const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
-const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard } = useClipboard()
+const { t } = useI18n(); const appStore = useAppStore(); const authStore = useAuthStore(); const { copyToClipboard } = useClipboard()
 
 const submitting = ref(false); const passwordCopied = ref(false)
-const roleOptions = computed(() => [
-  { value: 'user', label: t('admin.users.roles.user') },
-  { value: 'admin', label: t('admin.users.roles.admin') }
-])
+const roleOptions = computed(() => {
+  const options = [
+    { value: 'user', label: t('admin.users.roles.user') },
+    { value: 'enterprise_user', label: t('admin.users.roles.enterpriseUser') },
+  ]
+  if (authStore.hasPermission('admin.users.role_manage')) {
+    options.push(
+      { value: 'admin', label: t('admin.users.roles.admin') },
+      { value: 'super_admin', label: t('admin.users.roles.superAdmin') },
+    )
+  } else if (props.user && (props.user.role === 'admin' || props.user.role === 'super_admin')) {
+    options.push({ value: props.user.role, label: t(`admin.users.roles.${props.user.role === 'super_admin' ? 'superAdmin' : 'admin'}`) })
+  }
+  return options
+})
 const form = reactive({
   email: '',
   password: '',

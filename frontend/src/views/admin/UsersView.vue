@@ -28,7 +28,9 @@
                 v-model="filters.role"
                 :options="[
                   { value: '', label: t('admin.users.allRoles') },
+                  { value: 'super_admin', label: t('admin.users.roles.superAdmin') },
                   { value: 'admin', label: t('admin.users.admin') },
+                  { value: 'enterprise_user', label: t('admin.users.roles.enterpriseUser') },
                   { value: 'user', label: t('admin.users.user') }
                 ]"
                 @change="applyFilter"
@@ -623,7 +625,7 @@
 
               <!-- Toggle Status Button (not for admin) -->
               <button
-                v-if="row.role !== 'admin'"
+                v-if="!isStaffRole(row.role)"
                 @click="handleToggleStatus(row)"
                 :class="[
                   'flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors',
@@ -745,7 +747,7 @@
 
               <!-- Delete (not for admin) -->
               <button
-                v-if="user.role !== 'admin'"
+                v-if="!isStaffRole(user.role)"
                 @click="handleDelete(user); closeActionMenu()"
                 class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
               >
@@ -799,6 +801,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { useTableSelection } from '@/composables/useTableSelection'
 import { formatDateTime } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
+import { isStaffRole } from '@/utils/permissions'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'

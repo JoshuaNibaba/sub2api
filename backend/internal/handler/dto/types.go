@@ -14,6 +14,7 @@ type User struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
+	Permissions   []string   `json:"permissions"`
 	Balance       float64    `json:"balance"`
 	FrozenBalance float64    `json:"frozen_balance"`
 	Concurrency   int        `json:"concurrency"`
@@ -736,6 +737,26 @@ type UsageCleanupTask struct {
 type AccountSummary struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
+}
+
+// EnterpriseAccountPoolItem is the deliberately small account-pool view
+// exposed to enterprise users. It must not grow into the admin Account DTO:
+// credentials, proxy details, provider URLs, notes and raw error messages are
+// intentionally absent from this contract.
+type EnterpriseAccountPoolItem struct {
+	ID                  int64      `json:"id"`
+	Name                string     `json:"name"`
+	Platform            string     `json:"platform"`
+	Type                string     `json:"type"`
+	Status              string     `json:"status"`
+	Schedulable         bool       `json:"schedulable"`
+	Concurrency         int        `json:"concurrency"`
+	LoadFactor          *int       `json:"load_factor,omitempty"`
+	GroupIDs            []int64    `json:"group_ids,omitempty"`
+	LastUsedAt          *time.Time `json:"last_used_at,omitempty"`
+	RateLimited         bool       `json:"rate_limited"`
+	TemporarilyDisabled bool       `json:"temporarily_disabled"`
+	Health              string     `json:"health"`
 }
 
 type Setting struct {

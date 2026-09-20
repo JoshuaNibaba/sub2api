@@ -63,7 +63,7 @@ type CreateUserRequest struct {
 	Password             string   `json:"password" binding:"required,min=6"`
 	Username             string   `json:"username"`
 	Notes                string   `json:"notes"`
-	Role                 string   `json:"role" binding:"omitempty,oneof=admin user"`
+	Role                 string   `json:"role" binding:"omitempty,oneof=super_admin admin user enterprise_user"`
 	Balance              *float64 `json:"balance"`
 	Concurrency          int      `json:"concurrency"`
 	RPMLimit             int      `json:"rpm_limit"`
@@ -78,7 +78,7 @@ type UpdateUserRequest struct {
 	Password             string   `json:"password" binding:"omitempty,min=6"`
 	Username             *string  `json:"username"`
 	Notes                *string  `json:"notes"`
-	Role                 string   `json:"role" binding:"omitempty,oneof=admin user"`
+	Role                 string   `json:"role" binding:"omitempty,oneof=super_admin admin user enterprise_user"`
 	Balance              *float64 `json:"balance"`
 	Concurrency          *int     `json:"concurrency"`
 	RPMLimit             *int     `json:"rpm_limit"`
@@ -279,7 +279,11 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	// 创建管理员账号属权限敏感操作：需最近完成 step-up 2FA 验证。
-	if req.Role == service.RoleAdmin {
+	if req.Role == service.RoleSuperAdmin || req.Role == service.RoleAdmin {
+		if role, ok := middleware.GetUserRoleFromContext(c); ok && !service.HasPermission(role, service.PermissionAdminUsersRoleManage) {
+			response.Forbidden(c, "Only a super administrator can create administrator accounts")
+			return
+		}
 		if !middleware.EnforceStepUp(c, h.totpService, h.userService, h.settingService) {
 			return
 		}
@@ -321,22 +325,38 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// 防锁死保护：管理员不能把自己降级为普通用户(单管理员场景下会失去后台访问权)。
-	// 与既有"不能禁用/删除 admin"保护一致。降级其他管理员仍然允许。
-	if req.Role == service.RoleUser && userID == getAdminIDFromContext(c) {
+	// 防锁死保护：管理员不能把自己降级为普通用户或大客户。
+	if userID == getAdminIDFromContext(c) && req.Role != "" && req.Role != service.RoleSuperAdmin && req.Role != service.RoleAdmin {
 		response.BadRequest(c, "cannot demote yourself from admin")
 		return
 	}
 
-	// 把普通用户提升为管理员属权限敏感操作：需最近完成 step-up 2FA 验证。
-	// 目标已是管理员时（前端编辑表单总是携带 role）不触发，避免日常编辑被打断。
-	if req.Role == service.RoleAdmin {
-		target, err := h.adminService.GetUser(c.Request.Context(), userID)
+	// 角色字段由编辑表单总是携带，因此只有实际发生角色变化时才要求角色管理权限。
+	var target *service.User
+	if req.Role != "" {
+		target, err = h.adminService.GetUser(c.Request.Context(), userID)
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
 		}
-		if target.Role != service.RoleAdmin {
+		if req.Role != target.Role {
+			if role, ok := middleware.GetUserRoleFromContext(c); ok && !service.HasPermission(role, service.PermissionAdminUsersRoleManage) {
+				response.Forbidden(c, "Only a super administrator can change user roles")
+				return
+			}
+		}
+	}
+
+	// 把用户提升为管理员属权限敏感操作：需最近完成 step-up 2FA 验证。
+	if req.Role == service.RoleSuperAdmin || req.Role == service.RoleAdmin {
+		if target == nil {
+			target, err = h.adminService.GetUser(c.Request.Context(), userID)
+			if err != nil {
+				response.ErrorFrom(c, err)
+				return
+			}
+		}
+		if !target.IsAdmin() {
 			if !middleware.EnforceStepUp(c, h.totpService, h.userService, h.settingService) {
 				return
 			}

@@ -18,6 +18,7 @@ func UserFromServiceShallow(u *service.User) *User {
 		Email:                      u.Email,
 		Username:                   u.Username,
 		Role:                       u.Role,
+		Permissions:                permissionsFromServiceRole(u.Role),
 		Balance:                    u.Balance,
 		FrozenBalance:              u.FrozenBalance,
 		Concurrency:                u.Concurrency,
@@ -34,6 +35,15 @@ func UserFromServiceShallow(u *service.User) *User {
 		RPMLimit:                   u.RPMLimit,
 		DeletedAt:                  u.DeletedAt,
 	}
+}
+
+func permissionsFromServiceRole(role string) []string {
+	permissions := service.PermissionsForRole(role)
+	out := make([]string, len(permissions))
+	for i, permission := range permissions {
+		out[i] = string(permission)
+	}
+	return out
 }
 
 func UserFromService(u *service.User) *User {
@@ -671,6 +681,39 @@ func AccountSummaryFromService(a *service.Account) *AccountSummary {
 	return &AccountSummary{
 		ID:   a.ID,
 		Name: a.Name,
+	}
+}
+
+// EnterpriseAccountPoolFromService maps an account to the intentionally
+// redacted enterprise account-pool contract. Keep this mapper independent of
+// AccountFromService so adding admin fields can never widen this API.
+func EnterpriseAccountPoolFromService(a *service.Account, now time.Time) *EnterpriseAccountPoolItem {
+	if a == nil {
+		return nil
+	}
+	rateLimited := a.RateLimitedAt != nil && (a.RateLimitResetAt == nil || a.RateLimitResetAt.After(now))
+	temporarilyDisabled := a.TempUnschedulableUntil != nil && a.TempUnschedulableUntil.After(now)
+	health := "healthy"
+	switch {
+	case !a.Schedulable || a.Status != service.StatusActive:
+		health = "unavailable"
+	case rateLimited || temporarilyDisabled:
+		health = "degraded"
+	}
+	return &EnterpriseAccountPoolItem{
+		ID:                  a.ID,
+		Name:                a.Name,
+		Platform:            a.Platform,
+		Type:                a.Type,
+		Status:              a.Status,
+		Schedulable:         a.Schedulable,
+		Concurrency:         a.Concurrency,
+		LoadFactor:          a.LoadFactor,
+		GroupIDs:            append([]int64(nil), a.GroupIDs...),
+		LastUsedAt:          a.LastUsedAt,
+		RateLimited:         rateLimited,
+		TemporarilyDisabled: temporarilyDisabled,
+		Health:              health,
 	}
 }
 

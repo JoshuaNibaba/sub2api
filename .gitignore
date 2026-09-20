@@ -142,6 +142,7 @@ docs/*
 !docs/COMPOSITE_GROUPS.md
 !docs/PLUGIN_DEVELOPMENT.md
 !docs/PROJECT_CONTEXT.md
+!docs/ROLE_PERMISSION_DESIGN.md
 !docs/channel-monitor-v2-safe-defaults.md
 !docs/legal/
 !docs/legal/*.md

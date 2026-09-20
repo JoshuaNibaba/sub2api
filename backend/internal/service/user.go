@@ -69,7 +69,22 @@ type User struct {
 }
 
 func (u *User) IsAdmin() bool {
-	return u.Role == RoleAdmin
+	return u != nil && IsStaffRole(u.Role)
+}
+
+// IsSuperAdmin reports whether the user retains the full administrator role.
+func (u *User) IsSuperAdmin() bool {
+	return u != nil && IsSuperAdminRole(u.Role)
+}
+
+// IsEnterpriseUser reports whether the user has the enterprise read-only profile.
+func (u *User) IsEnterpriseUser() bool {
+	return u != nil && IsEnterpriseRole(u.Role)
+}
+
+// HasPermission resolves the centralized role policy for this user.
+func (u *User) HasPermission(permission Permission) bool {
+	return u != nil && HasPermission(u.Role, permission)
 }
 
 func (u *User) IsActive() bool {

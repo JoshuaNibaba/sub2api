@@ -808,6 +808,7 @@ export default {
     securityTitle: 'Security Settings',
     securityDescription: 'Password, two-factor authentication, and alerts live in the right rail.',
     administrator: 'Administrator',
+    enterpriseUser: 'Enterprise User',
     user: 'User',
     username: 'Username',
     email: 'Email',

@@ -214,6 +214,27 @@ export default {
     contentModeration: 'Content Moderation',
     promptAudit: 'Prompt Audit',
     auditLogs: 'Audit Logs',
+    enterprise: 'Enterprise Center',
+  },
+
+  enterprise: {
+    title: 'Enterprise Center',
+    description: 'View a redacted account pool, your usage, and limited error logs.',
+    accountPool: 'Account pool',
+    accountPoolHint: 'Only status and capacity are shown. Credentials, proxy authentication, and upstream URLs are never returned.',
+    usageLogs: 'Usage records',
+    usageLogsHint: 'Limited to records owned by the current account.',
+    errorLogs: 'Error logs',
+    errorLogsHint: 'Limited to redacted errors owned by the current account.',
+    recentRecords: '{count} records',
+    total: '{count} accounts',
+    name: 'Name',
+    platform: 'Platform',
+    type: 'Type',
+    health: 'Health',
+    capacity: 'Concurrency',
+    lastUsed: 'Last used',
+    healthValues: { healthy: 'Healthy', degraded: 'Degraded', unavailable: 'Unavailable' },
   },
 
   // Auth

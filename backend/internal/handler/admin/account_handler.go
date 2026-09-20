@@ -867,6 +867,44 @@ func (h *AccountHandler) List(c *gin.Context) {
 	response.Paginated(c, result, total, page, pageSize)
 }
 
+// EnterprisePool exposes a redacted, read-only view of the shared account
+// pool. It intentionally does not call List (whose response is an admin DTO)
+// so future admin fields cannot accidentally become enterprise-visible.
+// GET /api/v1/enterprise/account-pool
+func (h *AccountHandler) EnterprisePool(c *gin.Context) {
+	if h == nil || h.adminService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Account service not available")
+		return
+	}
+	page, pageSize := response.ParsePagination(c)
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	platform := strings.TrimSpace(c.Query("platform"))
+	search := strings.TrimSpace(c.Query("search"))
+	if len([]rune(search)) > 100 {
+		search = string([]rune(search)[:100])
+	}
+
+	accounts, total, err := h.adminService.ListAccounts(
+		c.Request.Context(), page, pageSize, platform, "", service.StatusActive,
+		search, 0, "", "name", "asc",
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	now := time.Now()
+	out := make([]dto.EnterpriseAccountPoolItem, 0, len(accounts))
+	for i := range accounts {
+		if item := dto.EnterpriseAccountPoolFromService(&accounts[i], now); item != nil {
+			out = append(out, *item)
+		}
+	}
+	response.Paginated(c, out, total, page, pageSize)
+}
+
 func buildAccountsListETag[T any](
 	items []T,
 	total int64,

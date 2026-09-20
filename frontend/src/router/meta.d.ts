@@ -19,6 +19,12 @@ declare module 'vue-router' {
      */
     requiresAdmin?: boolean
 
+    /** Capability required to enter this route. */
+    requiredPermission?: string
+
+    /** Whether this route is restricted to the full super administrator. */
+    requiresSuperAdmin?: boolean
+
     /**
      * Page title for this route
      */

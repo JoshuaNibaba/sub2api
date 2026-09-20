@@ -680,7 +680,9 @@ export default {
       createdAt: 'Created',
       totalRecharged: 'Total Recharged',
       roles: {
+        superAdmin: 'Super administrator',
         admin: 'Admin',
+        enterpriseUser: 'Enterprise user',
         user: 'User'
       },
       // Settings Dropdowns

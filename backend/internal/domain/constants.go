@@ -12,8 +12,14 @@ const (
 
 // Role constants
 const (
+	// RoleSuperAdmin is the migrated equivalent of the historical admin role.
+	// It retains the full administrator surface.
+	RoleSuperAdmin = "super_admin"
+	// RoleAdmin is the restricted administrator role.
 	RoleAdmin = "admin"
 	RoleUser  = "user"
+	// RoleEnterpriseUser is a user with explicitly granted read-only enterprise capabilities.
+	RoleEnterpriseUser = "enterprise_user"
 )
 
 // Platform constants
