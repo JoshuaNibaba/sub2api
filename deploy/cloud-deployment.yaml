@@ -1,0 +1,21 @@
+# Non-secret deployment connection and application settings.
+# Private keys, passwords and .env files must never be stored here.
+server:
+  host: 185.115.207.205
+  ssh_port: 12945
+  ssh_user: root
+  ssh_alias: sub2-cloud
+  ssh_identity_file: ~/.ssh/id_ed25519
+
+application:
+  domain: sub.aipcloud.xyz
+  image: ghcr.io/joshuanibaba/sub2api:sha-448721e9b6ebcbb1bd79d191dfe8f6356ff94374
+  image_latest: ghcr.io/joshuanibaba/sub2api:latest
+  container_name: sub2api
+  listen_port: 8080
+
+nginx:
+  upstream_host: 127.0.0.1
+  upstream_port: 8080
+  config_path: /etc/nginx/sites-available/sub.aipcloud.xyz
+  enabled_config_path: /etc/nginx/sites-enabled/sub.aipcloud.xyz
