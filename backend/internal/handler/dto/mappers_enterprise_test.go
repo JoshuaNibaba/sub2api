@@ -20,9 +20,12 @@ func TestEnterpriseAccountPoolFromServiceDoesNotExposeSecrets(t *testing.T) {
 		RateLimitedAt: timePtr(time.Now().Add(-time.Minute)), RateLimitResetAt: &reset,
 	}
 
-	item := EnterpriseAccountPoolFromService(account, time.Now())
+	item := EnterpriseAccountPoolFromService(account, time.Now(), 7, false)
 	if item == nil || item.Health != "degraded" || !item.RateLimited {
 		t.Fatalf("unexpected pool item: %#v", item)
+	}
+	if item.Name != "sh****ai" || item.OwnedByViewer {
+		t.Fatalf("non-owned account should be masked: %#v", item)
 	}
 	payload, err := json.Marshal(item)
 	if err != nil {
@@ -33,6 +36,15 @@ func TestEnterpriseAccountPoolFromServiceDoesNotExposeSecrets(t *testing.T) {
 		if strings.Contains(body, secret) {
 			t.Fatalf("enterprise payload leaked %q: %s", secret, body)
 		}
+	}
+}
+
+func TestEnterpriseAccountPoolFromServiceKeepsOwnedName(t *testing.T) {
+	owner := int64(7)
+	account := &service.Account{ID: 1, Name: "owned-account", OwnerUserID: &owner, Status: service.StatusActive, Schedulable: true}
+	item := EnterpriseAccountPoolFromService(account, time.Now(), owner, false)
+	if item == nil || item.Name != "owned-account" || !item.OwnedByViewer {
+		t.Fatalf("owned account should remain visible: %#v", item)
 	}
 }
 

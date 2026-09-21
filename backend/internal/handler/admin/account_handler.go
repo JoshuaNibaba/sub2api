@@ -28,6 +28,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -121,6 +122,7 @@ type CreateAccountRequest struct {
 	Credentials             map[string]any `json:"credentials" binding:"required"`
 	Extra                   map[string]any `json:"extra"`
 	ProxyID                 *int64         `json:"proxy_id"`
+	OwnerUserID             *int64         `json:"owner_user_id"`
 	Concurrency             int            `json:"concurrency"`
 	Priority                int            `json:"priority"`
 	RateMultiplier          *float64       `json:"rate_multiplier"`
@@ -141,6 +143,7 @@ type UpdateAccountRequest struct {
 	Credentials             map[string]any `json:"credentials"`
 	Extra                   map[string]any `json:"extra"`
 	ProxyID                 *int64         `json:"proxy_id"`
+	OwnerUserID             *int64         `json:"owner_user_id"`
 	Concurrency             *int           `json:"concurrency"`
 	Priority                *int           `json:"priority"`
 	RateMultiplier          *float64       `json:"rate_multiplier"`
@@ -352,6 +355,31 @@ func (h *AccountHandler) accountListResponseFromService(account *service.Account
 		h.ollamaCloudUsage.EnrichState(out.OllamaCloudUsage)
 	}
 	return out
+}
+
+// IsAccountOwnedBy is used by route middleware to authorize restricted
+// administrator mutations without exposing the admin service dependency to
+// the middleware package.
+func (h *AccountHandler) IsAccountOwnedBy(ctx context.Context, accountID, userID int64) (bool, error) {
+	if h == nil || h.adminService == nil {
+		return false, service.ErrAccountNotFound
+	}
+	account, err := h.adminService.GetAccount(ctx, accountID)
+	if err != nil {
+		return false, err
+	}
+	return account.IsOwnedBy(userID), nil
+}
+
+func accountViewer(c *gin.Context) (role string, userID int64) {
+	role, _ = servermiddleware.GetUserRoleFromContext(c)
+	subject, _ := servermiddleware.GetAuthSubjectFromContext(c)
+	return role, subject.UserID
+}
+
+func restrictedAccountViewer(c *gin.Context) (bool, int64) {
+	role, userID := accountViewer(c)
+	return service.IsStaffRole(role) && !service.IsSuperAdminRole(role), userID
 }
 
 func (h *AccountHandler) isSimpleMode() bool {
@@ -784,11 +812,19 @@ func (h *AccountHandler) List(c *gin.Context) {
 
 	// Build response with concurrency info
 	result := make([]AccountWithConcurrency, len(accounts))
+	restrictedViewer, viewerUserID := restrictedAccountViewer(c)
 	for i := range accounts {
 		acc := &accounts[i]
 		accountResponse := h.accountResponseFromService(acc)
+		if restrictedViewer && !acc.IsOwnedBy(viewerUserID) {
+			accountResponse = dto.AccountFromServiceMasked(acc)
+		}
 		if lite {
-			accountResponse = h.accountListResponseFromService(acc)
+			if restrictedViewer && !acc.IsOwnedBy(viewerUserID) {
+				accountResponse = dto.AccountFromServiceMasked(acc)
+			} else {
+				accountResponse = h.accountListResponseFromService(acc)
+			}
 			if h.isSimpleMode() {
 				accountResponse.GroupIDs = filterSimpleModeGroupIDs(accountResponse.GroupIDs, simpleModeCompositeServiceGroupIDs(acc))
 			}
@@ -826,6 +862,13 @@ func (h *AccountHandler) List(c *gin.Context) {
 	}
 
 	h.enrichShadowParents(c.Request.Context(), result)
+	if restrictedViewer {
+		for i := range result {
+			if result[i].Account == nil || result[i].Account.OwnerUserID == nil || *result[i].Account.OwnerUserID != viewerUserID {
+				result[i].Account = dto.AccountFromServiceMasked(&accounts[i])
+			}
+		}
+	}
 
 	if lite {
 		compact := make([]AccountListItemWithConcurrency, len(result))
@@ -895,10 +938,12 @@ func (h *AccountHandler) EnterprisePool(c *gin.Context) {
 		return
 	}
 
+	role, viewerUserID := accountViewer(c)
+	fullAccess := service.IsSuperAdminRole(role)
 	now := time.Now()
 	out := make([]dto.EnterpriseAccountPoolItem, 0, len(accounts))
 	for i := range accounts {
-		if item := dto.EnterpriseAccountPoolFromService(&accounts[i], now); item != nil {
+		if item := dto.EnterpriseAccountPoolFromService(&accounts[i], now, viewerUserID, fullAccess); item != nil {
 			out = append(out, *item)
 		}
 	}
@@ -980,7 +1025,13 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 			return
 		}
 	}
-
+	role, viewerUserID := accountViewer(c)
+	if service.IsStaffRole(role) && !service.IsSuperAdminRole(role) && !account.IsOwnedBy(viewerUserID) {
+		item := h.buildAccountResponseWithRuntime(c.Request.Context(), account)
+		item.Account = dto.AccountFromServiceMasked(account)
+		response.Success(c, item)
+		return
+	}
 	response.Success(c, h.buildAccountResponseWithRuntime(c.Request.Context(), account))
 }
 
@@ -1044,6 +1095,10 @@ func (h *AccountHandler) Create(c *gin.Context) {
 		response.BadRequest(c, "rate_multiplier must be >= 0")
 		return
 	}
+	if req.OwnerUserID != nil && *req.OwnerUserID <= 0 {
+		response.BadRequest(c, "owner_user_id must be positive")
+		return
+	}
 	// base_rpm 输入校验：负值归零，超过 10000 截断
 	sanitizeExtraBaseRPM(req.Extra)
 	if err := service.ValidateUpstreamRequestIDHeaderExtra(req.Extra); err != nil {
@@ -1053,6 +1108,18 @@ func (h *AccountHandler) Create(c *gin.Context) {
 
 	// 确定是否跳过混合渠道检查
 	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
+	ownerUserID := req.OwnerUserID
+	if ownerUserID != nil {
+		role, _ := servermiddleware.GetUserRoleFromContext(c)
+		if !service.IsSuperAdminRole(role) {
+			response.Forbidden(c, "Only a super administrator can assign account ownership")
+			return
+		}
+	} else if subject, ok := servermiddleware.GetAuthSubjectFromContext(c); ok && subject.UserID > 0 {
+		// New accounts are owned by the operator that created them unless a
+		// super administrator explicitly assigns another owner.
+		ownerUserID = &subject.UserID
+	}
 
 	// 捕获闭包内创建的账号引用，用于创建成功后触发异步探测。
 	// 幂等重放时闭包不会执行 → createdAccount 为 nil → 不重复调度。
@@ -1067,6 +1134,7 @@ func (h *AccountHandler) Create(c *gin.Context) {
 			Credentials:           req.Credentials,
 			Extra:                 req.Extra,
 			ProxyID:               req.ProxyID,
+			OwnerUserID:           ownerUserID,
 			Concurrency:           req.Concurrency,
 			Priority:              req.Priority,
 			RateMultiplier:        req.RateMultiplier,
@@ -1181,6 +1249,17 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		response.BadRequest(c, "rate_multiplier must be >= 0")
 		return
 	}
+	if req.OwnerUserID != nil && *req.OwnerUserID <= 0 {
+		response.BadRequest(c, "owner_user_id must be positive")
+		return
+	}
+	if req.OwnerUserID != nil {
+		role, _ := servermiddleware.GetUserRoleFromContext(c)
+		if !service.IsSuperAdminRole(role) {
+			response.Forbidden(c, "Only a super administrator can change account ownership")
+			return
+		}
+	}
 	// base_rpm 输入校验：负值归零，超过 10000 截断
 	sanitizeExtraBaseRPM(req.Extra)
 	if err := service.ValidateUpstreamRequestIDHeaderExtra(req.Extra); err != nil {
@@ -1198,6 +1277,7 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		Credentials:           req.Credentials,
 		Extra:                 req.Extra,
 		ProxyID:               req.ProxyID,
+		OwnerUserID:           req.OwnerUserID,
 		Concurrency:           req.Concurrency, // 指针类型，nil 表示未提供
 		Priority:              req.Priority,    // 指针类型，nil 表示未提供
 		RateMultiplier:        req.RateMultiplier,

@@ -1159,6 +1159,7 @@ export interface OllamaCloudUsageSettings {
 export interface Account {
   id: number
   name: string
+  owner_user_id?: number | null
   notes?: string | null
   platform: AccountPlatform
   type: AccountType
@@ -1479,6 +1480,7 @@ export interface CreateAccountRequest {
   credentials: Record<string, unknown>
   extra?: Record<string, unknown>
   proxy_id?: number | null
+  owner_user_id?: number | null
   concurrency?: number
   load_factor?: number | null
   priority?: number
@@ -1497,6 +1499,7 @@ export interface UpdateAccountRequest {
   credentials?: Record<string, unknown>
   extra?: Record<string, unknown>
   proxy_id?: number | null
+  owner_user_id?: number | null
   concurrency?: number
   load_factor?: number | null
   priority?: number

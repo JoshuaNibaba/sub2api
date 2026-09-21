@@ -22,7 +22,7 @@ export { totpAPI } from './totp'
 export { passkeyAPI, type PasskeyCredentialSummary } from './passkey'
 export { default as announcementsAPI } from './announcements'
 export { channelMonitorUserAPI } from './channelMonitor'
-export { enterpriseAPI, type EnterpriseAccountPoolItem, type EnterpriseAccountPoolParams } from './enterprise'
+export { enterpriseAPI, type EnterpriseAccountPoolItem, type EnterpriseAccountPoolParams, type ScopedUsageLog } from './enterprise'
 
 // Admin APIs
 export { adminAPI } from './admin'

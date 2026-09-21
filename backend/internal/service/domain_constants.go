@@ -38,6 +38,7 @@ const (
 	PermissionAdminGroupsWrite      = domain.PermissionAdminGroupsWrite
 	PermissionAdminAccountsRead     = domain.PermissionAdminAccountsRead
 	PermissionAdminAccountsWrite    = domain.PermissionAdminAccountsWrite
+	PermissionAdminAccountsOwnedWrite = domain.PermissionAdminAccountsOwnedWrite
 	PermissionAdminCredentialsRead  = domain.PermissionAdminCredentialsRead
 	PermissionAdminProxiesRead      = domain.PermissionAdminProxiesRead
 	PermissionAdminProxiesWrite     = domain.PermissionAdminProxiesWrite

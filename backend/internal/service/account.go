@@ -29,6 +29,7 @@ type Account struct {
 	Credentials             map[string]any
 	Extra                   map[string]any
 	ProxyID                 *int64
+	OwnerUserID             *int64
 	ProxyFallbackOriginID   *int64
 	ProxyFallbackOriginName *string // 仅展示用
 	Concurrency             int
@@ -82,6 +83,12 @@ type Account struct {
 	headerOverrideCacheRawPtr         uintptr
 	headerOverrideCacheRawLen         int
 	headerOverrideCacheRawSig         uint64
+}
+
+// IsOwnedBy reports whether this account is explicitly assigned to a user.
+// A nil owner is a shared/unassigned account and is never treated as owned.
+func (a *Account) IsOwnedBy(userID int64) bool {
+	return a != nil && userID > 0 && a.OwnerUserID != nil && *a.OwnerUserID == userID
 }
 
 type OpenAIEndpointCapability string

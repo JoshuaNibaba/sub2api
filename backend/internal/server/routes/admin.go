@@ -365,7 +365,7 @@ func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	accounts := admin.Group("/accounts")
-	accounts.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminAccountsWrite))
+	accounts.Use(middleware.RequireAccountRouteAccess(h.Admin.Account))
 	{
 		accounts.GET("", h.Admin.Account.List)
 		accounts.GET("/upstream-billing-rates", h.Admin.Account.GetUpstreamBillingRates)

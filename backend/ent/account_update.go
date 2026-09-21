@@ -151,6 +151,33 @@ func (_u *AccountUpdate) ClearProxyID() *AccountUpdate {
 	return _u
 }
 
+// SetOwnerUserID sets the "owner_user_id" field.
+func (_u *AccountUpdate) SetOwnerUserID(v int64) *AccountUpdate {
+	_u.mutation.ResetOwnerUserID()
+	_u.mutation.SetOwnerUserID(v)
+	return _u
+}
+
+// SetNillableOwnerUserID sets the "owner_user_id" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableOwnerUserID(v *int64) *AccountUpdate {
+	if v != nil {
+		_u.SetOwnerUserID(*v)
+	}
+	return _u
+}
+
+// AddOwnerUserID adds value to the "owner_user_id" field.
+func (_u *AccountUpdate) AddOwnerUserID(v int64) *AccountUpdate {
+	_u.mutation.AddOwnerUserID(v)
+	return _u
+}
+
+// ClearOwnerUserID clears the value of the "owner_user_id" field.
+func (_u *AccountUpdate) ClearOwnerUserID() *AccountUpdate {
+	_u.mutation.ClearOwnerUserID()
+	return _u
+}
+
 // SetProxyFallbackOriginID sets the "proxy_fallback_origin_id" field.
 func (_u *AccountUpdate) SetProxyFallbackOriginID(v int64) *AccountUpdate {
 	_u.mutation.ResetProxyFallbackOriginID()
@@ -832,6 +859,15 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
 	}
+	if value, ok := _u.mutation.OwnerUserID(); ok {
+		_spec.SetField(account.FieldOwnerUserID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedOwnerUserID(); ok {
+		_spec.AddField(account.FieldOwnerUserID, field.TypeInt64, value)
+	}
+	if _u.mutation.OwnerUserIDCleared() {
+		_spec.ClearField(account.FieldOwnerUserID, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.ProxyFallbackOriginID(); ok {
 		_spec.SetField(account.FieldProxyFallbackOriginID, field.TypeInt64, value)
 	}
@@ -1288,6 +1324,33 @@ func (_u *AccountUpdateOne) SetNillableProxyID(v *int64) *AccountUpdateOne {
 // ClearProxyID clears the value of the "proxy_id" field.
 func (_u *AccountUpdateOne) ClearProxyID() *AccountUpdateOne {
 	_u.mutation.ClearProxyID()
+	return _u
+}
+
+// SetOwnerUserID sets the "owner_user_id" field.
+func (_u *AccountUpdateOne) SetOwnerUserID(v int64) *AccountUpdateOne {
+	_u.mutation.ResetOwnerUserID()
+	_u.mutation.SetOwnerUserID(v)
+	return _u
+}
+
+// SetNillableOwnerUserID sets the "owner_user_id" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableOwnerUserID(v *int64) *AccountUpdateOne {
+	if v != nil {
+		_u.SetOwnerUserID(*v)
+	}
+	return _u
+}
+
+// AddOwnerUserID adds value to the "owner_user_id" field.
+func (_u *AccountUpdateOne) AddOwnerUserID(v int64) *AccountUpdateOne {
+	_u.mutation.AddOwnerUserID(v)
+	return _u
+}
+
+// ClearOwnerUserID clears the value of the "owner_user_id" field.
+func (_u *AccountUpdateOne) ClearOwnerUserID() *AccountUpdateOne {
+	_u.mutation.ClearOwnerUserID()
 	return _u
 }
 
@@ -2001,6 +2064,15 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 	}
 	if value, ok := _u.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.OwnerUserID(); ok {
+		_spec.SetField(account.FieldOwnerUserID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedOwnerUserID(); ok {
+		_spec.AddField(account.FieldOwnerUserID, field.TypeInt64, value)
+	}
+	if _u.mutation.OwnerUserIDCleared() {
+		_spec.ClearField(account.FieldOwnerUserID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.ProxyFallbackOriginID(); ok {
 		_spec.SetField(account.FieldProxyFallbackOriginID, field.TypeInt64, value)

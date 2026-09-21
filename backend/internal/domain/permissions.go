@@ -17,6 +17,7 @@ const (
 	PermissionAdminGroupsWrite      Permission = "admin.groups.write"
 	PermissionAdminAccountsRead     Permission = "admin.accounts.read"
 	PermissionAdminAccountsWrite    Permission = "admin.accounts.write"
+	PermissionAdminAccountsOwnedWrite Permission = "admin.accounts.owned_write"
 	PermissionAdminCredentialsRead  Permission = "admin.credentials.read"
 	PermissionAdminProxiesRead      Permission = "admin.proxies.read"
 	PermissionAdminProxiesWrite     Permission = "admin.proxies.write"
@@ -49,6 +50,7 @@ var allPermissions = []Permission{
 	PermissionAdminGroupsWrite,
 	PermissionAdminAccountsRead,
 	PermissionAdminAccountsWrite,
+	PermissionAdminAccountsOwnedWrite,
 	PermissionAdminCredentialsRead,
 	PermissionAdminProxiesRead,
 	PermissionAdminProxiesWrite,
@@ -85,6 +87,7 @@ var rolePermissions = map[string]map[Permission]struct{}{
 		PermissionAdminGroupsRead,
 		PermissionAdminGroupsWrite,
 		PermissionAdminAccountsRead,
+		PermissionAdminAccountsOwnedWrite,
 		PermissionAdminUsageRead,
 		PermissionAdminOpsRead,
 		PermissionAdminProxiesRead,

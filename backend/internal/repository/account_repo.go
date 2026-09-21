@@ -142,6 +142,7 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 		SetNillableNotes(account.Notes).
 		SetPlatform(account.Platform).
 		SetType(account.Type).
+		SetNillableOwnerUserID(account.OwnerUserID).
 		SetCredentials(normalizeJSONMap(account.Credentials)).
 		SetExtra(normalizeJSONMap(account.Extra)).
 		SetConcurrency(account.Concurrency).
@@ -536,6 +537,7 @@ func (r *accountRepository) updateLockedAccount(
 		SetNillableNotes(account.Notes).
 		SetPlatform(account.Platform).
 		SetType(account.Type).
+		SetNillableOwnerUserID(account.OwnerUserID).
 		SetCredentials(normalizeJSONMap(account.Credentials)).
 		SetExtra(extra).
 		SetConcurrency(account.Concurrency).
@@ -3466,6 +3468,7 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Credentials:             copyJSONMap(m.Credentials),
 		Extra:                   copyJSONMap(m.Extra),
 		ProxyID:                 m.ProxyID,
+		OwnerUserID:             m.OwnerUserID,
 		ProxyFallbackOriginID:   m.ProxyFallbackOriginID,
 		Concurrency:             m.Concurrency,
 		Priority:                m.Priority,

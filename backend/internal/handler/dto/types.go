@@ -206,11 +206,12 @@ type AdminGroup struct {
 }
 
 type Account struct {
-	ID       int64   `json:"id"`
-	Name     string  `json:"name"`
-	Notes    *string `json:"notes"`
-	Platform string  `json:"platform"`
-	Type     string  `json:"type"`
+	ID          int64   `json:"id"`
+	Name        string  `json:"name"`
+	OwnerUserID *int64  `json:"owner_user_id,omitempty"`
+	Notes       *string `json:"notes"`
+	Platform    string  `json:"platform"`
+	Type        string  `json:"type"`
 	// Credentials 经 RedactCredentials 处理后只含非敏感子键；敏感 token / api_key / 私钥
 	// 的存在性通过 CredentialsStatus（has_<key>）暴露，原始值不返回前端。
 	Credentials             map[string]any                 `json:"credentials"`
@@ -331,11 +332,12 @@ type Account struct {
 // repeated account_groups and groups object graphs. Fetch /admin/accounts/:id
 // for the complete Account DTO when editing or inspecting an account.
 type AccountListItem struct {
-	ID       int64   `json:"id"`
-	Name     string  `json:"name"`
-	Notes    *string `json:"notes"`
-	Platform string  `json:"platform"`
-	Type     string  `json:"type"`
+	ID          int64   `json:"id"`
+	Name        string  `json:"name"`
+	OwnerUserID *int64  `json:"owner_user_id,omitempty"`
+	Notes       *string `json:"notes"`
+	Platform    string  `json:"platform"`
+	Type        string  `json:"type"`
 
 	Credentials       map[string]any                 `json:"credentials,omitempty"`
 	CredentialsStatus map[string]bool                `json:"credentials_status,omitempty"`
@@ -739,6 +741,15 @@ type AccountSummary struct {
 	Name string `json:"name"`
 }
 
+// ScopedUsageLog is the safe request-history projection for restricted
+// administrators and enterprise users. It adds the selected upstream account
+// while keeping the regular user billing/request fields and redaction rules.
+type ScopedUsageLog struct {
+	UsageLog
+	Account            *AccountSummary `json:"account,omitempty"`
+	AccountOwnedByUser bool            `json:"account_owned_by_user"`
+}
+
 // EnterpriseAccountPoolItem is the deliberately small account-pool view
 // exposed to enterprise users. It must not grow into the admin Account DTO:
 // credentials, proxy details, provider URLs, notes and raw error messages are
@@ -746,6 +757,7 @@ type AccountSummary struct {
 type EnterpriseAccountPoolItem struct {
 	ID                  int64      `json:"id"`
 	Name                string     `json:"name"`
+	OwnedByViewer       bool       `json:"owned_by_viewer"`
 	Platform            string     `json:"platform"`
 	Type                string     `json:"type"`
 	Status              string     `json:"status"`
