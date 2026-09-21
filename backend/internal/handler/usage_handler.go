@@ -259,6 +259,37 @@ func (h *UsageHandler) List(c *gin.Context) {
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
 
+// ListScoped is the enterprise/restricted-admin request history view. It
+// keeps the current-user ownership filter from List and adds only the selected
+// account's redacted identity so callers can verify which pool account handled
+// their request.
+func (h *UsageHandler) ListScoped(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	parsed, ok := h.parseUserUsageFilters(c, false)
+	if !ok {
+		return
+	}
+	params := pagination.PaginationParams{
+		Page:      page,
+		PageSize:  pageSize,
+		SortBy:    c.DefaultQuery("sort_by", "created_at"),
+		SortOrder: c.DefaultQuery("sort_order", "desc"),
+	}
+	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, parsed.Filters)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	subject, _ := middleware2.GetAuthSubjectFromContext(c)
+	out := make([]dto.ScopedUsageLog, 0, len(records))
+	for i := range records {
+		if item := dto.ScopedUsageLogFromService(&records[i], subject.UserID); item != nil {
+			out = append(out, *item)
+		}
+	}
+	response.Paginated(c, out, result.Total, page, pageSize)
+}
+
 // ListErrors handles listing the current user's failed requests (redacted).
 // GET /api/v1/usage/errors
 func (h *UsageHandler) ListErrors(c *gin.Context) {

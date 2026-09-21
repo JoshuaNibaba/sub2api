@@ -401,6 +401,7 @@ type CreateAccountInput struct {
 	Credentials        map[string]any
 	Extra              map[string]any
 	ProxyID            *int64
+	OwnerUserID        *int64
 	Concurrency        int
 	Priority           int
 	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
@@ -443,6 +444,9 @@ type UpdateAccountInput struct {
 	ProbeEnabled          *bool
 	RateSyncEnabled       *bool
 	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
+	// OwnerUserID is only changeable by a super administrator. nil means keep
+	// the current owner when updating an account.
+	OwnerUserID *int64
 }
 
 // BulkUpdateAccountsInput describes the payload for bulk updating accounts.

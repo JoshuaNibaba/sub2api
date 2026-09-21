@@ -35,7 +35,7 @@ func RegisterUserRoutes(
 				enterprise.GET("/account-pool", middleware.RequirePermission(service.PermissionEnterpriseAccountPool), h.Admin.Account.EnterprisePool)
 			}
 			if h.Usage != nil {
-				enterprise.GET("/usage-logs", middleware.RequirePermission(service.PermissionEnterpriseUsage), h.Usage.List)
+				enterprise.GET("/usage-logs", middleware.RequirePermission(service.PermissionEnterpriseUsage), h.Usage.ListScoped)
 				enterprise.GET("/error-logs", middleware.RequirePermission(service.PermissionEnterpriseLogs), h.Usage.ListEnterpriseErrors)
 			}
 		}

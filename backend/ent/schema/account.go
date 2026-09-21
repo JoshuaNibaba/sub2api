@@ -91,6 +91,13 @@ func (Account) Fields() []ent.Field {
 		field.Int64("proxy_id").
 			Optional().
 			Nillable(),
+		// owner_user_id: the operator/user that owns this upstream account.
+		// NULL means shared/unassigned and is visible only as a redacted account
+		// to restricted administrators and enterprise users.
+		field.Int64("owner_user_id").
+			Optional().
+			Nillable().
+			Comment("Owning application user; NULL means shared/unassigned."),
 		field.Int64("proxy_fallback_origin_id").
 			Optional().Nillable().
 			Comment("Original proxy id replaced by expiry-fallback; for manual revert. NULL = not in fallback."),
@@ -235,6 +242,7 @@ func (Account) Edges() []ent.Edge {
 func (Account) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("platform"),            // 按平台筛选
+		index.Fields("owner_user_id"),       // 按账号归属筛选
 		index.Fields("type"),                // 按认证类型筛选
 		index.Fields("status"),              // 按状态筛选
 		index.Fields("proxy_id"),            // 按代理筛选

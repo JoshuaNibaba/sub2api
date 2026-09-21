@@ -427,6 +427,7 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Credentials: input.Credentials,
 		Extra:       accountExtra,
 		ProxyID:     input.ProxyID,
+		OwnerUserID: input.OwnerUserID,
 		Concurrency: normalizeAccountConcurrency(input.Platform, input.Type, input.Concurrency),
 		Priority:    input.Priority,
 		Status:      StatusActive,
@@ -629,6 +630,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 
 	if input.Name != "" {
 		account.Name = input.Name
+	}
+	if input.OwnerUserID != nil {
+		account.OwnerUserID = input.OwnerUserID
 	}
 	if input.Type != "" {
 		account.Type = input.Type

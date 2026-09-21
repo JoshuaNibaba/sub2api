@@ -254,6 +254,7 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 	out := &Account{
 		ID:                      a.ID,
 		Name:                    a.Name,
+		OwnerUserID:             a.OwnerUserID,
 		Notes:                   a.Notes,
 		Platform:                a.Platform,
 		Type:                    a.Type,
@@ -466,7 +467,7 @@ func AccountListItemFromAccount(a *Account) *AccountListItem {
 		return nil
 	}
 	return &AccountListItem{
-		ID: a.ID, Name: a.Name, Notes: a.Notes, Platform: a.Platform, Type: a.Type,
+		ID: a.ID, Name: a.Name, OwnerUserID: a.OwnerUserID, Notes: a.Notes, Platform: a.Platform, Type: a.Type,
 		Credentials: a.Credentials, CredentialsStatus: a.CredentialsStatus, Extra: a.Extra,
 		OllamaCloudUsage: a.OllamaCloudUsage,
 		ProxyID:          a.ProxyID, ProxyFallbackOriginID: a.ProxyFallbackOriginID, ProxyFallbackOriginName: a.ProxyFallbackOriginName,
@@ -684,10 +685,29 @@ func AccountSummaryFromService(a *service.Account) *AccountSummary {
 	}
 }
 
+func ScopedUsageLogFromService(l *service.UsageLog, viewerUserID int64) *ScopedUsageLog {
+	if l == nil {
+		return nil
+	}
+	account := AccountSummaryFromService(l.Account)
+	owned := l.Account != nil && l.Account.IsOwnedBy(viewerUserID)
+	if account == nil && l.AccountID > 0 {
+		account = &AccountSummary{ID: l.AccountID, Name: "****"}
+	}
+	if account != nil && !owned {
+		account.Name = maskAccountName(account.Name)
+	}
+	return &ScopedUsageLog{
+		UsageLog:           *UsageLogFromService(l),
+		Account:            account,
+		AccountOwnedByUser: owned,
+	}
+}
+
 // EnterpriseAccountPoolFromService maps an account to the intentionally
 // redacted enterprise account-pool contract. Keep this mapper independent of
 // AccountFromService so adding admin fields can never widen this API.
-func EnterpriseAccountPoolFromService(a *service.Account, now time.Time) *EnterpriseAccountPoolItem {
+func EnterpriseAccountPoolFromService(a *service.Account, now time.Time, viewerUserID int64, fullAccess bool) *EnterpriseAccountPoolItem {
 	if a == nil {
 		return nil
 	}
@@ -700,9 +720,15 @@ func EnterpriseAccountPoolFromService(a *service.Account, now time.Time) *Enterp
 	case rateLimited || temporarilyDisabled:
 		health = "degraded"
 	}
+	owned := fullAccess || a.IsOwnedBy(viewerUserID)
+	name := a.Name
+	if !owned {
+		name = maskAccountName(name)
+	}
 	return &EnterpriseAccountPoolItem{
 		ID:                  a.ID,
-		Name:                a.Name,
+		Name:                name,
+		OwnedByViewer:       owned,
 		Platform:            a.Platform,
 		Type:                a.Type,
 		Status:              a.Status,
@@ -715,6 +741,42 @@ func EnterpriseAccountPoolFromService(a *service.Account, now time.Time) *Enterp
 		TemporarilyDisabled: temporarilyDisabled,
 		Health:              health,
 	}
+}
+
+// AccountFromServiceMasked is the safe projection for an account that is not
+// owned by the current administrator/enterprise user. It keeps operational
+// basics while removing credentials, proxy details, notes, error text, groups
+// and provider-specific extras.
+func AccountFromServiceMasked(a *service.Account) *Account {
+	if a == nil {
+		return nil
+	}
+	return &Account{
+		ID:          a.ID,
+		Name:        maskAccountName(a.Name),
+		Platform:    a.Platform,
+		Type:        a.Type,
+		Status:      a.Status,
+		Concurrency: a.Concurrency,
+		LoadFactor:  a.LoadFactor,
+		Priority:    a.Priority,
+		Schedulable: a.Schedulable,
+		LastUsedAt:  a.LastUsedAt,
+		CreatedAt:   a.CreatedAt,
+		UpdatedAt:   a.UpdatedAt,
+	}
+}
+
+func maskAccountName(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "****"
+	}
+	runes := []rune(value)
+	if len(runes) <= 4 {
+		return "****"
+	}
+	return string(runes[:2]) + "****" + string(runes[len(runes)-2:])
 }
 
 func usageLogFromServiceUser(l *service.UsageLog) UsageLog {

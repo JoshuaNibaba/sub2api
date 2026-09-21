@@ -76,6 +76,34 @@
           </div>
         </div>
       </div>
+
+      <div v-if="canViewUsage" class="card overflow-hidden">
+        <div class="border-b border-gray-200 px-4 py-3 dark:border-dark-700">
+          <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('enterprise.requestRouting') }}</h2>
+          <p class="mt-1 text-xs text-gray-500">{{ t('enterprise.requestRoutingHint') }}</p>
+        </div>
+        <div v-if="recentUsage.length === 0" class="p-8 text-center text-sm text-gray-500">{{ t('common.noData') }}</div>
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+            <thead class="bg-gray-50 dark:bg-dark-800">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('enterprise.requestTime') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('enterprise.model') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('enterprise.hitAccount') }}</th>
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('enterprise.cost') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-900">
+              <tr v-for="item in recentUsage" :key="item.id">
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{{ formatTime(item.created_at) }}</td>
+                <td class="max-w-[240px] truncate px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.model }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{{ item.account?.name || '****' }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums text-gray-600 dark:text-gray-300">${{ item.total_cost.toFixed(6) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -84,7 +112,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { enterpriseAPI, type EnterpriseAccountPoolItem } from '@/api'
+import { enterpriseAPI, type EnterpriseAccountPoolItem, type ScopedUsageLog } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { Permission } from '@/utils/permissions'
 
@@ -96,6 +124,7 @@ const page = ref(1)
 const pool = ref({ items: [] as EnterpriseAccountPoolItem[], total: 0, page: 1, page_size: 20, pages: 1 })
 const usageCount = ref(0)
 const errorCount = ref(0)
+const recentUsage = ref<ScopedUsageLog[]>([])
 const canViewUsage = computed(() => authStore.hasPermission(Permission.EnterpriseUsage))
 const canViewLogs = computed(() => authStore.hasPermission(Permission.EnterpriseLogs))
 const platforms = ['openai', 'anthropic', 'gemini', 'antigravity', 'grok']
@@ -114,8 +143,9 @@ async function loadPool(targetPage = page.value) {
 async function refresh() {
   await loadPool(1)
   if (canViewUsage.value) {
-    const result = await enterpriseAPI.listUsageLogs({ page: 1, page_size: 1 })
+    const result = await enterpriseAPI.listUsageLogs({ page: 1, page_size: 10 })
     usageCount.value = result.total
+    recentUsage.value = result.items
   }
   if (canViewLogs.value) {
     const result = await enterpriseAPI.listErrorLogs({ page: 1, page_size: 1 })
@@ -140,4 +170,3 @@ function healthClass(value: string) {
 
 onMounted(() => { refresh().catch(() => undefined) })
 </script>
-
