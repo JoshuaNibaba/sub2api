@@ -864,7 +864,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 	h.enrichShadowParents(c.Request.Context(), result)
 	if restrictedViewer {
 		for i := range result {
-			if result[i].Account == nil || result[i].Account.OwnerUserID == nil || *result[i].Account.OwnerUserID != viewerUserID {
+			if result[i].Account == nil || result[i].OwnerUserID == nil || *result[i].OwnerUserID != viewerUserID {
 				result[i].Account = dto.AccountFromServiceMasked(&accounts[i])
 			}
 		}

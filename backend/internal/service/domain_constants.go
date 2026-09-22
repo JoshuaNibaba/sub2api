@@ -29,36 +29,36 @@ const (
 type Permission = domain.Permission
 
 const (
-	PermissionAdminPanel            = domain.PermissionAdminPanel
-	PermissionAdminDashboardRead    = domain.PermissionAdminDashboardRead
-	PermissionAdminUsersRead        = domain.PermissionAdminUsersRead
-	PermissionAdminUsersWrite       = domain.PermissionAdminUsersWrite
-	PermissionAdminUsersRoleManage  = domain.PermissionAdminUsersRoleManage
-	PermissionAdminGroupsRead       = domain.PermissionAdminGroupsRead
-	PermissionAdminGroupsWrite      = domain.PermissionAdminGroupsWrite
-	PermissionAdminAccountsRead     = domain.PermissionAdminAccountsRead
-	PermissionAdminAccountsWrite    = domain.PermissionAdminAccountsWrite
+	PermissionAdminPanel              = domain.PermissionAdminPanel
+	PermissionAdminDashboardRead      = domain.PermissionAdminDashboardRead
+	PermissionAdminUsersRead          = domain.PermissionAdminUsersRead
+	PermissionAdminUsersWrite         = domain.PermissionAdminUsersWrite
+	PermissionAdminUsersRoleManage    = domain.PermissionAdminUsersRoleManage
+	PermissionAdminGroupsRead         = domain.PermissionAdminGroupsRead
+	PermissionAdminGroupsWrite        = domain.PermissionAdminGroupsWrite
+	PermissionAdminAccountsRead       = domain.PermissionAdminAccountsRead
+	PermissionAdminAccountsWrite      = domain.PermissionAdminAccountsWrite
 	PermissionAdminAccountsOwnedWrite = domain.PermissionAdminAccountsOwnedWrite
-	PermissionAdminCredentialsRead  = domain.PermissionAdminCredentialsRead
-	PermissionAdminProxiesRead      = domain.PermissionAdminProxiesRead
-	PermissionAdminProxiesWrite     = domain.PermissionAdminProxiesWrite
-	PermissionAdminUsageRead        = domain.PermissionAdminUsageRead
-	PermissionAdminUsageWrite       = domain.PermissionAdminUsageWrite
-	PermissionAdminOpsRead          = domain.PermissionAdminOpsRead
-	PermissionAdminOpsWrite         = domain.PermissionAdminOpsWrite
-	PermissionAdminSettingsRead     = domain.PermissionAdminSettingsRead
-	PermissionAdminSettingsWrite    = domain.PermissionAdminSettingsWrite
-	PermissionAdminSystemWrite      = domain.PermissionAdminSystemWrite
-	PermissionAdminPaymentRead      = domain.PermissionAdminPaymentRead
-	PermissionAdminPaymentWrite     = domain.PermissionAdminPaymentWrite
-	PermissionAdminSecurityRead     = domain.PermissionAdminSecurityRead
-	PermissionAdminSecurityWrite    = domain.PermissionAdminSecurityWrite
-	PermissionAdminPluginsWrite     = domain.PermissionAdminPluginsWrite
-	PermissionAdminAuditRead        = domain.PermissionAdminAuditRead
-	PermissionAdminAuditWrite       = domain.PermissionAdminAuditWrite
-	PermissionEnterpriseAccountPool = domain.PermissionEnterpriseAccountPool
-	PermissionEnterpriseUsage       = domain.PermissionEnterpriseUsage
-	PermissionEnterpriseLogs        = domain.PermissionEnterpriseLogs
+	PermissionAdminCredentialsRead    = domain.PermissionAdminCredentialsRead
+	PermissionAdminProxiesRead        = domain.PermissionAdminProxiesRead
+	PermissionAdminProxiesWrite       = domain.PermissionAdminProxiesWrite
+	PermissionAdminUsageRead          = domain.PermissionAdminUsageRead
+	PermissionAdminUsageWrite         = domain.PermissionAdminUsageWrite
+	PermissionAdminOpsRead            = domain.PermissionAdminOpsRead
+	PermissionAdminOpsWrite           = domain.PermissionAdminOpsWrite
+	PermissionAdminSettingsRead       = domain.PermissionAdminSettingsRead
+	PermissionAdminSettingsWrite      = domain.PermissionAdminSettingsWrite
+	PermissionAdminSystemWrite        = domain.PermissionAdminSystemWrite
+	PermissionAdminPaymentRead        = domain.PermissionAdminPaymentRead
+	PermissionAdminPaymentWrite       = domain.PermissionAdminPaymentWrite
+	PermissionAdminSecurityRead       = domain.PermissionAdminSecurityRead
+	PermissionAdminSecurityWrite      = domain.PermissionAdminSecurityWrite
+	PermissionAdminPluginsWrite       = domain.PermissionAdminPluginsWrite
+	PermissionAdminAuditRead          = domain.PermissionAdminAuditRead
+	PermissionAdminAuditWrite         = domain.PermissionAdminAuditWrite
+	PermissionEnterpriseAccountPool   = domain.PermissionEnterpriseAccountPool
+	PermissionEnterpriseUsage         = domain.PermissionEnterpriseUsage
+	PermissionEnterpriseLogs          = domain.PermissionEnterpriseLogs
 )
 
 func HasPermission(role string, permission Permission) bool {

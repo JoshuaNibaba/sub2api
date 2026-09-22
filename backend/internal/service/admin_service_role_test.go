@@ -98,20 +98,20 @@ func (s *roleGuardUserRepoStub) ListWithFilters(_ context.Context, _ pagination.
 	return nil, &pagination.PaginationResult{Total: s.adminTotal}, nil
 }
 
-func TestAdminService_UpdateUser_DemoteLastAdminRejected(t *testing.T) {
-	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleAdmin}}
+func TestAdminService_UpdateUser_DemoteLastSuperAdminRejected(t *testing.T) {
+	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleSuperAdmin}}
 	repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 1}
 	svc := &adminServiceImpl{userRepo: repo, redeemCodeRepo: &redeemRepoStub{}}
 
 	_, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Role: RoleUser})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "last admin")
-	require.Nil(t, repo.lastUpdated, "最后一个管理员不应被降级持久化")
-	require.Equal(t, 1, repo.listCalls, "降级路径应触发管理员计数")
+	require.Contains(t, err.Error(), "last super admin")
+	require.Nil(t, repo.lastUpdated, "最后一个超级管理员不应被降级持久化")
+	require.Equal(t, 1, repo.listCalls, "降级超级管理员路径应触发计数")
 }
 
-func TestAdminService_UpdateUser_DemoteAdminAllowedWhenOthersExist(t *testing.T) {
-	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleAdmin}}
+func TestAdminService_UpdateUser_DemoteSuperAdminAllowedWhenOthersExist(t *testing.T) {
+	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleSuperAdmin}}
 	repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 2}
 	invalidator := &authCacheInvalidatorStub{}
 	svc := &adminServiceImpl{
