@@ -24,6 +24,7 @@
          discover the manual refresh. -->
     <div class="flex flex-wrap items-center gap-1.5">
       <button
+        v-if="interactive"
         type="button"
         data-test="cn-provider-quota-probe"
         class="inline-flex items-center gap-0.5 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium leading-4 text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
@@ -68,9 +69,12 @@ import type { Account } from '@/types'
 import { cnQuotaCellVisible } from './credentialsBuilder'
 import UsageProgressBar from './UsageProgressBar.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   account: Account
-}>()
+  interactive?: boolean
+}>(), {
+  interactive: true
+})
 
 const { t } = useI18n()
 
@@ -136,6 +140,7 @@ const snapshotIsStale = computed(() => {
 onMounted(() => {
   if (!visible.value) return
   data.value = snapshotData.value
+  if (!props.interactive) return
   if (!snapshotIsStale.value) return
   // 模块级去抖：列表页每行一个实例，翻页/筛选/刷新会重复挂载；同一账号
   // 短时间内已自动探测过则跳过，避免对上游形成探测风暴。
@@ -172,6 +177,7 @@ const windowLabel = (window: string) => {
 }
 
 const handleProbe = async () => {
+  if (!props.interactive) return
   if (loading.value) return
   loading.value = true
   error.value = null

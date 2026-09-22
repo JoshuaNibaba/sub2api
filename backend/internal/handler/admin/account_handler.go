@@ -924,14 +924,40 @@ func (h *AccountHandler) EnterprisePool(c *gin.Context) {
 		pageSize = 100
 	}
 	platform := strings.TrimSpace(c.Query("platform"))
+	accountType := strings.TrimSpace(c.Query("type"))
+	status := strings.TrimSpace(c.Query("status"))
+	if status == "" {
+		// Keep the account-pool contract focused on schedulable/active entries by
+		// default, while allowing the canonical table status filter to opt into a
+		// specific status without exposing any admin-only fields.
+		status = service.StatusActive
+	}
+	groupID := int64(0)
+	if groupQuery := strings.TrimSpace(c.Query("group")); groupQuery != "" {
+		if groupQuery == accountListGroupUngroupedQueryValue {
+			groupID = service.AccountListGroupUngrouped
+		} else {
+			parsedGroupID, parseErr := strconv.ParseInt(groupQuery, 10, 64)
+			if parseErr != nil || parsedGroupID < 0 {
+				response.ErrorFrom(c, infraerrors.BadRequest("INVALID_GROUP_FILTER", "invalid group filter"))
+				return
+			}
+			groupID = parsedGroupID
+		}
+	}
+	sortBy := strings.TrimSpace(c.DefaultQuery("sort_by", "name"))
+	sortOrder := strings.ToLower(strings.TrimSpace(c.DefaultQuery("sort_order", "asc")))
+	if sortOrder != "desc" {
+		sortOrder = "asc"
+	}
 	search := strings.TrimSpace(c.Query("search"))
 	if len([]rune(search)) > 100 {
 		search = string([]rune(search)[:100])
 	}
 
 	accounts, total, err := h.adminService.ListAccounts(
-		c.Request.Context(), page, pageSize, platform, "", service.StatusActive,
-		search, 0, "", "name", "asc",
+		c.Request.Context(), page, pageSize, platform, accountType, status,
+		search, groupID, "", sortBy, sortOrder,
 	)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -2777,6 +2803,29 @@ type BatchUsageRequest struct {
 	Force      bool    `json:"force"`
 }
 
+// restrictBatchAccountIDs prevents the read-only batch endpoints from being
+// used as an ownership oracle by restricted administrators. The route
+// middleware intentionally permits these endpoints so the canonical account
+// table can render owned runtime data, therefore the handler must scope the
+// requested IDs before querying usage services.
+func (h *AccountHandler) restrictBatchAccountIDs(c *gin.Context, accountIDs []int64) ([]int64, error) {
+	restricted, viewerUserID := restrictedAccountViewer(c)
+	if !restricted || len(accountIDs) == 0 {
+		return accountIDs, nil
+	}
+	accounts, err := h.adminService.GetAccountsByIDs(c.Request.Context(), accountIDs)
+	if err != nil {
+		return nil, err
+	}
+	owned := make([]int64, 0, len(accounts))
+	for _, account := range accounts {
+		if account != nil && account.IsOwnedBy(viewerUserID) {
+			owned = append(owned, account.ID)
+		}
+	}
+	return owned, nil
+}
+
 // GetBatchTodayStats 批量获取多个账号的今日统计。
 // POST /api/v1/admin/accounts/today-stats/batch
 func (h *AccountHandler) GetBatchTodayStats(c *gin.Context) {
@@ -2787,6 +2836,11 @@ func (h *AccountHandler) GetBatchTodayStats(c *gin.Context) {
 	}
 
 	accountIDs := normalizeInt64IDList(req.AccountIDs)
+	accountIDs, scopeErr := h.restrictBatchAccountIDs(c, accountIDs)
+	if scopeErr != nil {
+		response.ErrorFrom(c, scopeErr)
+		return
+	}
 	if len(accountIDs) == 0 {
 		response.Success(c, gin.H{"stats": map[string]any{}})
 		return
@@ -2833,6 +2887,11 @@ func (h *AccountHandler) GetBatchUsage(c *gin.Context) {
 	}
 
 	accountIDs := normalizeInt64IDList(req.AccountIDs)
+	accountIDs, scopeErr := h.restrictBatchAccountIDs(c, accountIDs)
+	if scopeErr != nil {
+		response.ErrorFrom(c, scopeErr)
+		return
+	}
 	if len(accountIDs) == 0 {
 		response.Success(c, gin.H{
 			"usage":  map[string]any{},

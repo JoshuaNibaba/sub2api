@@ -4,6 +4,7 @@ import type { PaginatedResponse, UsageLog, UsageQueryParams, UserErrorRequest } 
 export interface EnterpriseAccountPoolItem {
   id: number
   name: string
+  owned_by_viewer: boolean
   platform: string
   type: string
   status: string
@@ -21,6 +22,11 @@ export interface EnterpriseAccountPoolParams {
   page?: number
   page_size?: number
   platform?: string
+  type?: string
+  status?: string
+  group?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
   search?: string
 }
 

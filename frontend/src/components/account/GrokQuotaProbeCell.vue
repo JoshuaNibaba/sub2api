@@ -2,6 +2,7 @@
   <div v-if="visible" class="space-y-1">
     <div class="flex flex-wrap items-center gap-1.5">
       <button
+        v-if="interactive"
         type="button"
         class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-cyan-700 transition-colors hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-cyan-300 dark:hover:bg-cyan-900/30"
         :disabled="loading"
@@ -51,8 +52,9 @@ const props = withDefaults(
     account: Account
     /** When true, only show the probe button (+ errors). No duplicate weekly summary. */
     compact?: boolean
+    interactive?: boolean
   }>(),
-  { compact: false }
+  { compact: false, interactive: true }
 )
 
 const emit = defineEmits<{ probed: [result: GrokQuotaProbeResult] }>()
@@ -97,6 +99,7 @@ const truncatedError = computed(() => {
 })
 
 const handleProbe = async () => {
+  if (!props.interactive) return
   if (loading.value) return
   loading.value = true
   error.value = null

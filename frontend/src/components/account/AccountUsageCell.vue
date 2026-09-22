@@ -86,6 +86,7 @@
             {{ t('admin.accounts.usageWindow.passiveSampled') }}
           </span>
           <button
+            v-if="allowAdminProbes"
             type="button"
             class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
             :disabled="activeQueryLoading"
@@ -143,9 +144,10 @@
           refresh button is rendered via the pre-actions slot so the user sees a
           single row of related buttons instead of two stacked rows.
         -->
-        <OpenAIQuotaResetCell :account="account" @account-updated="handleQuotaResetAccountUpdated">
+        <OpenAIQuotaResetCell :account="account" :interactive="allowAdminProbes" @account-updated="handleQuotaResetAccountUpdated">
           <template #pre-actions>
             <button
+              v-if="allowAdminProbes"
               type="button"
               class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="activeQueryLoading"
@@ -187,6 +189,7 @@
         <!-- Always allow on-demand upstream quota query, even before local data exists. -->
         <OpenAIQuotaResetCell
           :account="account"
+          :interactive="allowAdminProbes"
           class="mt-1"
           @account-updated="handleQuotaResetAccountUpdated"
         />
@@ -422,11 +425,11 @@
         <div v-if="grokRetryAfterLabel" class="text-[10px] text-amber-600 dark:text-amber-400">
           {{ t('admin.accounts.usageWindow.grokRetryAfter', { time: grokRetryAfterLabel }) }}
         </div>
-        <GrokQuotaProbeCell :account="account" compact @probed="handleGrokProbed" />
+        <GrokQuotaProbeCell :account="account" :interactive="allowAdminProbes" compact @probed="handleGrokProbed" />
       </div>
       <div v-else class="space-y-1">
         <div class="text-xs text-gray-400">-</div>
-        <GrokQuotaProbeCell :account="account" compact @probed="handleGrokProbed" />
+        <GrokQuotaProbeCell :account="account" :interactive="allowAdminProbes" compact @probed="handleGrokProbed" />
       </div>
     </template>
 
@@ -439,6 +442,7 @@
       <OllamaCloudUsageCell
         v-if="account.ollama_cloud_usage?.eligible"
         :account="account"
+        :interactive="allowAdminProbes"
         @updated="handleOllamaCloudUsageUpdated"
       />
       <div v-else class="space-y-1">
@@ -449,8 +453,8 @@
           class="text-xs text-gray-400"
           :title="t('admin.accounts.cnProviders.noBalanceEndpoint')"
         >-</div>
-        <CNProviderQuotaCell :account="account" />
-        <CNProviderBalanceCell :account="account" />
+        <CNProviderQuotaCell :account="account" :interactive="allowAdminProbes" />
+        <CNProviderBalanceCell :account="account" :interactive="allowAdminProbes" />
       </div>
     </template>
 
@@ -579,6 +583,7 @@
       <OllamaCloudUsageCell
         v-if="account.ollama_cloud_usage?.eligible"
         :account="account"
+        :interactive="allowAdminProbes"
         @updated="handleOllamaCloudUsageUpdated"
       />
       <!-- Today stats row (requests, tokens, cost, user_cost) -->
@@ -677,6 +682,8 @@ const props = withDefaults(
     batchedUsageError?: string | null
     batchedUsageLoading?: boolean
     requestBatchedUsage?: ((account: Account, options?: { force?: boolean }) => void) | null
+    queryEnabled?: boolean
+    allowAdminProbes?: boolean
   }>(),
   {
     todayStats: null,
@@ -685,7 +692,9 @@ const props = withDefaults(
     batchedUsage: null,
     batchedUsageError: null,
     batchedUsageLoading: false,
-    requestBatchedUsage: null
+    requestBatchedUsage: null,
+    queryEnabled: true,
+    allowAdminProbes: true
   }
 )
 
@@ -738,6 +747,7 @@ const showUsageWindows = computed(() => {
 })
 
 const shouldFetchUsage = computed(() => {
+  if (!props.queryEnabled) return false
   if (props.account.platform === 'anthropic') {
     return props.account.type === 'oauth' || props.account.type === 'setup-token'
   }
@@ -1472,6 +1482,7 @@ const attachVisibilityObserver = () => {
 }
 
 const loadActiveUsage = async () => {
+  if (!props.allowAdminProbes || !props.queryEnabled) return
   activeQueryLoading.value = true
   try {
     usageInfo.value = await adminAPI.accounts.getUsage(props.account.id, 'active', true)

@@ -11,7 +11,7 @@
       owns that real estate. This cell is purely about the rate-limit reset
       credit: query its count, consume one if needed.
     -->
-    <div class="flex flex-wrap items-center gap-1.5">
+    <div v-if="interactive" class="flex flex-wrap items-center gap-1.5">
       <slot name="pre-actions" />
 
       <button
@@ -151,6 +151,7 @@
     </div>
 
     <ConfirmDialog
+      v-if="interactive"
       :show="showResetConfirm"
       :title="t('admin.accounts.openaiQuotaReset.confirmTitle')"
       :message="t('admin.accounts.openaiQuotaReset.confirmMessage', { count: availableResetCount })"
@@ -175,9 +176,12 @@ import {
 } from '@/api/admin/accounts'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   account: Account
-}>()
+  interactive?: boolean
+}>(), {
+  interactive: true
+})
 
 const emit = defineEmits<{
   'account-updated': [account: Account]
@@ -383,6 +387,7 @@ const toggleResetCreditDetails = () => {
 }
 
 const handleQuery = async () => {
+  if (!props.interactive) return
   if (loading.value) return
   loading.value = true
   error.value = null
@@ -408,6 +413,7 @@ const handleQuery = async () => {
 }
 
 const openResetConfirm = () => {
+  if (!props.interactive) return
   if (resetting.value || loading.value) return
   if (!canReset.value) {
     error.value = t('admin.accounts.openaiQuotaReset.noCreditsAvailable')
@@ -417,6 +423,7 @@ const openResetConfirm = () => {
 }
 
 const confirmReset = async () => {
+  if (!props.interactive) return
   showResetConfirm.value = false
   if (resetting.value) return
   if (!canReset.value) {

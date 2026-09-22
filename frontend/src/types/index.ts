@@ -1160,6 +1160,8 @@ export interface Account {
   id: number
   name: string
   owner_user_id?: number | null
+  /** Safe enterprise account-pool projection adapted to the full table layout. */
+  enterprise_redacted?: boolean
   notes?: string | null
   platform: AccountPlatform
   type: AccountType

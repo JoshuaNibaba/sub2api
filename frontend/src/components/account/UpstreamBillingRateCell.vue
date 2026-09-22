@@ -69,6 +69,7 @@
       {{ statusLabel }}
     </span>
     <button
+      v-if="canProbe"
       type="button"
       class="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
       :disabled="probing"
@@ -96,8 +97,10 @@ const props = withDefaults(defineProps<{
   now: number
   probing?: boolean
   globalProbeEnabled?: boolean
+  canProbe?: boolean
 }>(), {
-  globalProbeEnabled: true
+  globalProbeEnabled: true,
+  canProbe: true
 })
 
 defineEmits<{

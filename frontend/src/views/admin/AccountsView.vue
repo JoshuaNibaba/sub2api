@@ -1,30 +1,6 @@
 <template>
   <AppLayout>
-    <TablePageLayout v-if="enterpriseReadOnly">
-      <template #filters>
-        <div class="flex flex-wrap items-end gap-3">
-          <div class="w-full sm:w-64">
-            <label class="input-label">{{ t('common.search') }}</label>
-            <input v-model="params.search" class="input" :placeholder="t('common.searchPlaceholder')" @input="debouncedReload" />
-          </div>
-          <div class="w-full sm:w-40">
-            <label class="input-label">{{ t('enterprise.platform') }}</label>
-            <select v-model="params.platform" class="input" @change="debouncedReload">
-              <option value="">{{ t('common.all') }}</option>
-              <option v-for="item in enterprisePlatforms" :key="item" :value="item">{{ item }}</option>
-            </select>
-          </div>
-          <button class="btn btn-secondary" :disabled="loading" @click="reload">{{ t('common.refresh') }}</button>
-        </div>
-      </template>
-      <template #table>
-        <DataTable :columns="enterpriseColumns" :data="accounts" :loading="loading" row-key="id" />
-      </template>
-      <template #pagination>
-        <Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="baseHandlePageChange" @update:pageSize="baseHandlePageSizeChange" />
-      </template>
-    </TablePageLayout>
-    <TablePageLayout v-else>
+    <TablePageLayout>
       <template #filters>
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters
@@ -36,14 +12,14 @@
             @update:searchQuery="debouncedReload"
           />
           <AccountTableActions
-            v-if="!enterpriseReadOnly"
             :loading="loading"
+            :can-create="!enterpriseReadOnly"
             @refresh="handleManualRefresh"
             @create="showCreate = true"
           >
-            <template #after v-if="!restrictedAdmin">
+            <template #after>
               <!-- Auto Refresh Dropdown -->
-              <div class="relative" ref="autoRefreshDropdownRef">
+              <div v-if="!enterpriseReadOnly" class="relative" ref="autoRefreshDropdownRef">
                 <button
                   @click="
                     showAutoRefreshDropdown = !showAutoRefreshDropdown;
@@ -108,24 +84,24 @@
                     @click.stop
                   >
                     <div class="overflow-y-auto p-2" :style="{ maxHeight: `${accountToolsDropdownPosition.maxHeight}px` }">
-                      <div class="px-2 py-2">
+                      <div v-if="!enterpriseReadOnly && !restrictedAdmin" class="px-2 py-2">
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                           {{ t('admin.accounts.dataActions') }}
                         </div>
                       </div>
-                      <button class="account-tools-menu-item" @click="openSyncFromCrs">
+                      <button v-if="!enterpriseReadOnly && !restrictedAdmin" class="account-tools-menu-item" @click="openSyncFromCrs">
                         <span class="account-tools-menu-icon bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
                           <Icon name="sync" size="sm" />
                         </span>
                         <span class="flex-1 text-left">{{ t('admin.accounts.syncFromCrs') }}</span>
                       </button>
-                      <button class="account-tools-menu-item" @click="openImportData">
+                      <button v-if="!enterpriseReadOnly && !restrictedAdmin" class="account-tools-menu-item" @click="openImportData">
                         <span class="account-tools-menu-icon bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
                           <Icon name="upload" size="sm" />
                         </span>
                         <span class="flex-1 text-left">{{ t('admin.accounts.dataImport') }}</span>
                       </button>
-                      <button class="account-tools-menu-item" @click="openExportDataDialogFromMenu">
+                      <button v-if="!enterpriseReadOnly && !restrictedAdmin" class="account-tools-menu-item" @click="openExportDataDialogFromMenu">
                         <span class="account-tools-menu-icon bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">
                           <Icon name="download" size="sm" />
                         </span>
@@ -140,19 +116,19 @@
                         </span>
                       </button>
 
-                      <div class="my-2 border-t border-gray-100 dark:border-dark-700"></div>
-                      <div class="px-2 py-2">
+                      <div v-if="!enterpriseReadOnly && !restrictedAdmin" class="my-2 border-t border-gray-100 dark:border-dark-700"></div>
+                      <div v-if="!enterpriseReadOnly && !restrictedAdmin" class="px-2 py-2">
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                           {{ t('admin.accounts.toolActions') }}
                         </div>
                       </div>
-                      <button class="account-tools-menu-item" @click="openErrorPassthrough">
+                      <button v-if="!enterpriseReadOnly && !restrictedAdmin" class="account-tools-menu-item" @click="openErrorPassthrough">
                         <span class="account-tools-menu-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
                           <Icon name="shield" size="sm" />
                         </span>
                         <span class="flex-1 text-left">{{ t('admin.errorPassthrough.title') }}</span>
                       </button>
-                      <button class="account-tools-menu-item" @click="openTLSFingerprintProfiles">
+                      <button v-if="!enterpriseReadOnly && !restrictedAdmin" class="account-tools-menu-item" @click="openTLSFingerprintProfiles">
                         <span class="account-tools-menu-icon bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200">
                           <Icon name="lock" size="sm" />
                         </span>
@@ -238,12 +214,13 @@
               type="checkbox"
               class="h-4 w-4 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               :checked="allVisibleSelected"
+              :disabled="enterpriseReadOnly || restrictedAdmin"
               @click.stop
               @change="toggleSelectAllVisible($event)"
             />
           </template>
           <template #cell-select="{ row }">
-            <input type="checkbox" :checked="isSelected(row.id)" @change="toggleSel(row.id)" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+            <input type="checkbox" :checked="isSelected(row.id)" :disabled="!canMutateAccount(row)" @change="toggleSel(row.id)" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40" />
           </template>
           <template #cell-id="{ value }">
             <span class="font-mono text-xs text-gray-500 dark:text-gray-400">#{{ value }}</span>
@@ -318,15 +295,15 @@
             </div>
           </template>
           <template #cell-schedulable="{ row }">
-            <button @click="handleToggleSchedulable(row)" :disabled="togglingSchedulable === row.id" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800" :class="[row.schedulable ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500']" :title="row.schedulable ? t('admin.accounts.schedulableEnabled') : t('admin.accounts.schedulableDisabled')">
+            <button @click="handleToggleSchedulable(row)" :disabled="!canMutateAccount(row) || togglingSchedulable === row.id" class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800" :class="[row.schedulable ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500']" :title="row.schedulable ? t('admin.accounts.schedulableEnabled') : t('admin.accounts.schedulableDisabled')">
               <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="[row.schedulable ? 'translate-x-4' : 'translate-x-0']" />
             </button>
           </template>
           <template #cell-today_stats="{ row }">
             <AccountTodayStatsCell
-              :stats="todayStatsByAccountId[String(row.id)] ?? null"
-              :loading="todayStatsLoading"
-              :error="todayStatsError"
+              :stats="canQueryAccountOperationalData(row) ? (todayStatsByAccountId[String(row.id)] ?? null) : null"
+              :loading="canQueryAccountOperationalData(row) && todayStatsLoading"
+              :error="canQueryAccountOperationalData(row) ? todayStatsError : null"
             />
           </template>
           <template #cell-groups="{ row }">
@@ -341,13 +318,15 @@
           <template #cell-usage="{ row }">
             <AccountUsageCell
               :account="row"
-              :today-stats="todayStatsByAccountId[String(row.id)] ?? null"
-              :today-stats-loading="todayStatsLoading"
+              :today-stats="canQueryAccountOperationalData(row) ? (todayStatsByAccountId[String(row.id)] ?? null) : null"
+              :today-stats-loading="canQueryAccountOperationalData(row) && todayStatsLoading"
               :manual-refresh-token="usageManualRefreshToken"
               :batched-usage="usageBatchByAccountId[String(row.id)] ?? null"
               :batched-usage-error="usageBatchErrorByAccountId[String(row.id)] ?? null"
               :batched-usage-loading="usageBatchLoadingByAccountId[String(row.id)] === true"
-              :request-batched-usage="isDesktopViewport ? queueBatchedUsage : null"
+              :query-enabled="canQueryAccountOperationalData(row)"
+              :allow-admin-probes="canProbeAccountOperationalData(row)"
+              :request-batched-usage="isDesktopViewport && canQueryAccountOperationalData(row) ? queueBatchedUsage : null"
               @account-updated="handleAccountUpdated"
               @usage-loaded="handleAccountUsageLoaded(row.id, $event)"
             />
@@ -369,15 +348,15 @@
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :title="t('admin.accounts.fallbackActiveTip', { origin: row.proxy_fallback_origin_name })">
                   {{ t('admin.accounts.fallbackActive') }}
                 </span>
-                <button class="text-xs px-1.5 py-0.5 rounded border border-gray-300 dark:border-dark-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700" @click="onRevertFallback(row)">{{ t('admin.accounts.revertProxy') }}</button>
+                <button v-if="!restrictedAdmin" class="text-xs px-1.5 py-0.5 rounded border border-gray-300 dark:border-dark-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700" @click="onRevertFallback(row)">{{ t('admin.accounts.revertProxy') }}</button>
               </div>
             </div>
           </template>
           <template #cell-rate_multiplier="{ row }">
             <span class="inline-flex items-center gap-1 text-sm font-mono text-gray-700 dark:text-gray-300">
-              <span>{{ formatMultiplier(row.rate_multiplier ?? 1) }}x</span>
+              <span>{{ isRedactedAccount(row) ? '-' : `${formatMultiplier(row.rate_multiplier ?? 1)}x` }}</span>
               <span
-                v-if="row.extra?.upstream_billing_rate_sync_enabled === true"
+                v-if="!isRedactedAccount(row) && row.extra?.upstream_billing_rate_sync_enabled === true"
                 class="inline-flex cursor-help text-emerald-600 dark:text-emerald-400"
                 :aria-label="t('admin.accounts.upstreamBilling.syncedRateTooltip')"
                 :title="t('admin.accounts.upstreamBilling.syncedRateTooltip')"
@@ -398,14 +377,15 @@
           <template #cell-upstream_billing_rate="{ row }">
             <UpstreamBillingRateCell
               :account="row"
+              :can-probe="canProbeAccountOperationalData(row)"
               :global-probe-enabled="upstreamBillingProbeGloballyEnabled"
               :now="upstreamBillingNow"
               :probing="probingUpstreamBilling.has(row.id)"
               @probe="handleProbeUpstreamBilling(row)"
             />
           </template>
-          <template #cell-priority="{ value }">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{ value }}</span>
+          <template #cell-priority="{ row, value }">
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ isRedactedAccount(row) ? '-' : value }}</span>
           </template>
           <template #header-scheduler_score="{ column }">
             <div class="flex items-center">
@@ -467,7 +447,7 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                 <span class="text-xs">{{ t('common.delete') }}</span>
               </button>
-              <button @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white">
+              <button v-if="!restrictedAdmin" @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
                 <span class="text-xs">{{ t('common.more') }}</span>
               </button>
@@ -569,21 +549,25 @@ import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupSc
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
-const enterpriseReadOnly = computed(() => !authStore.isAdmin && authStore.hasPermission('enterprise.account_pool.read'))
+const enterpriseReadOnly = computed(() => !authStore.isAdmin && (authStore.hasPermission?.('enterprise.account_pool.read') ?? false))
 const restrictedAdmin = computed(() => authStore.isAdmin && !authStore.isSuperAdmin)
 const canMutateAccount = (row: Pick<AccountListItem, 'owner_user_id'>) => {
+  if (enterpriseReadOnly.value) return false
   if (!restrictedAdmin.value) return true
   return row.owner_user_id === authStore.user?.id
 }
-const enterprisePlatforms = ['openai', 'anthropic', 'gemini', 'antigravity', 'grok']
-const enterpriseColumns = computed(() => [
-  { key: 'name', label: t('admin.accounts.columns.name'), sortable: false },
-  { key: 'platform', label: t('enterprise.platform'), sortable: false },
-  { key: 'type', label: t('admin.accounts.accountType'), sortable: false },
-  { key: 'status', label: t('admin.accounts.columns.status'), sortable: false },
-  { key: 'concurrency', label: t('admin.accounts.columns.capacity'), sortable: false },
-  { key: 'last_used_at', label: t('admin.accounts.columns.lastUsed'), sortable: false },
-])
+const isRedactedAccount = (row: Pick<AccountListItem, 'owner_user_id'> & { enterprise_redacted?: boolean }) => {
+  if (row.enterprise_redacted === true) return true
+  return restrictedAdmin.value && row.owner_user_id !== authStore.user?.id
+}
+const canQueryAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'> & { enterprise_redacted?: boolean }) => {
+  if (enterpriseReadOnly.value) return false
+  if (!restrictedAdmin.value) return true
+  return row.owner_user_id === authStore.user?.id
+}
+const canProbeAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'> & { enterprise_redacted?: boolean }) => {
+  return !enterpriseReadOnly.value && !restrictedAdmin.value && canQueryAccountOperationalData(row)
+}
 
 const enterprisePoolToAccount = (item: EnterpriseAccountPoolItem): AccountListItem => ({
   id: item.id,
@@ -616,6 +600,8 @@ const enterprisePoolToAccount = (item: EnterpriseAccountPoolItem): AccountListIt
   session_window_start: null,
   session_window_end: null,
   session_window_status: null,
+  owner_user_id: item.owned_by_viewer ? authStore.user?.id ?? null : null,
+  enterprise_redacted: true,
 })
 
 const proxies = ref<AccountProxy[]>([])
@@ -907,6 +893,7 @@ const flushQueuedUsageBatch = async () => {
 }
 
 const queueBatchedUsage = (account: Account, options?: { force?: boolean }) => {
+  if (enterpriseReadOnly.value || !canQueryAccountOperationalData(account)) return
   if (!isDesktopViewport.value) return
   if (!accountSupportsBatchUsage(account)) return
 
@@ -944,6 +931,7 @@ const queueBatchedUsage = (account: Account, options?: { force?: boolean }) => {
 }
 
 const refreshTodayStatsBatch = async () => {
+  if (enterpriseReadOnly.value) return
   // Why this checks both columns:
   // - today_stats column shows dedicated today's metrics.
   // - usage column also embeds today's stats for Key/Bedrock rows.
@@ -1163,6 +1151,11 @@ const {
         page,
         page_size: pageSize,
         platform: typeof filters.platform === 'string' ? filters.platform : undefined,
+        type: typeof filters.type === 'string' ? filters.type : undefined,
+        status: typeof filters.status === 'string' ? filters.status : undefined,
+        group: typeof filters.group === 'string' ? filters.group : undefined,
+        sort_by: typeof filters.sort_by === 'string' ? filters.sort_by : undefined,
+        sort_order: filters.sort_order === 'desc' ? 'desc' : 'asc',
         search: typeof filters.search === 'string' ? filters.search : undefined,
       })
       return {
@@ -1340,6 +1333,7 @@ const applyUpstreamBillingRateSnapshots = async (
 }
 
 const refreshUpstreamBillingRates = async (force = false) => {
+  if (enterpriseReadOnly.value || restrictedAdmin.value) return
   if (upstreamBillingRateRefreshing.value || loading.value || accounts.value.length === 0) return
   if (!force && (
     probingUpstreamBilling.size > 0 ||
@@ -1533,6 +1527,7 @@ const mergeAccountsIncrementally = (nextRows: Account[]) => {
 }
 
 const refreshAccountsIncrementally = async () => {
+  if (enterpriseReadOnly.value) return
   if (autoRefreshFetching.value) return
   syncAccountListDerivedParams()
   autoRefreshFetching.value = true
@@ -1574,7 +1569,10 @@ const refreshAccountsIncrementally = async () => {
 }
 
 const handleManualRefresh = async () => {
-  await Promise.all([load(), loadUpstreamBillingProbeGlobalState()])
+  await load()
+  if (!enterpriseReadOnly.value && !restrictedAdmin.value) {
+    await loadUpstreamBillingProbeGlobalState()
+  }
   // Force usage cells to refetch /usage on explicit user refresh.
   usageManualRefreshToken.value += 1
 }
@@ -2630,7 +2628,9 @@ onMounted(async () => {
 
 	load()
 	if (enterpriseReadOnly.value) return
-	loadUpstreamBillingProbeGlobalState()
+	if (!restrictedAdmin.value) {
+	  loadUpstreamBillingProbeGlobalState()
+	}
   const [proxiesResult, groupsResult] = await Promise.allSettled([
     adminAPI.proxies.getAll(),
     adminAPI.groups.getAll()

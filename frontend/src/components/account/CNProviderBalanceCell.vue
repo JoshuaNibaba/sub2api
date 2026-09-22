@@ -25,6 +25,7 @@
          affordance explicit. -->
     <div class="flex flex-wrap items-center gap-1.5">
       <button
+        v-if="interactive"
         type="button"
         data-test="cn-provider-balance-probe"
         class="inline-flex items-center gap-0.5 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium leading-4 text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
@@ -65,9 +66,12 @@ import type { Account } from '@/types'
 import { platformTextClass } from '@/utils/platformColors'
 import { cnBalanceCellVisible } from './credentialsBuilder'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   account: Account
-}>()
+  interactive?: boolean
+}>(), {
+  interactive: true
+})
 
 const { t } = useI18n()
 
@@ -155,6 +159,7 @@ const truncatedError = computed(() => {
 })
 
 const handleProbe = async () => {
+  if (!props.interactive) return
   if (loading.value) return
   loading.value = true
   error.value = null
