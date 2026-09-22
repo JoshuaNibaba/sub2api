@@ -750,27 +750,6 @@ type ScopedUsageLog struct {
 	AccountOwnedByUser bool            `json:"account_owned_by_user"`
 }
 
-// EnterpriseAccountPoolItem is the deliberately small account-pool view
-// exposed to enterprise users. It must not grow into the admin Account DTO:
-// credentials, proxy details, provider URLs, notes and raw error messages are
-// intentionally absent from this contract.
-type EnterpriseAccountPoolItem struct {
-	ID                  int64      `json:"id"`
-	Name                string     `json:"name"`
-	OwnedByViewer       bool       `json:"owned_by_viewer"`
-	Platform            string     `json:"platform"`
-	Type                string     `json:"type"`
-	Status              string     `json:"status"`
-	Schedulable         bool       `json:"schedulable"`
-	Concurrency         int        `json:"concurrency"`
-	LoadFactor          *int       `json:"load_factor,omitempty"`
-	GroupIDs            []int64    `json:"group_ids,omitempty"`
-	LastUsedAt          *time.Time `json:"last_used_at,omitempty"`
-	RateLimited         bool       `json:"rate_limited"`
-	TemporarilyDisabled bool       `json:"temporarily_disabled"`
-	Health              string     `json:"health"`
-}
-
 type Setting struct {
 	ID        int64     `json:"id"`
 	Key       string    `json:"key"`

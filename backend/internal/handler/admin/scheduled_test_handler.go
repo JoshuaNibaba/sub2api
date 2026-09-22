@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -34,6 +35,24 @@ type updateScheduledTestPlanRequest struct {
 	Enabled        *bool  `json:"enabled"`
 	MaxResults     int    `json:"max_results"`
 	AutoRecover    *bool  `json:"auto_recover"`
+}
+
+// AccountIDForPlan resolves the account a scheduled-test plan belongs to so
+// route middleware can apply the same ownership rule as the account routes.
+// A plan's results describe how a specific account behaves upstream, so they
+// must not be readable by an administrator who cannot read that account.
+func (h *ScheduledTestHandler) AccountIDForPlan(ctx context.Context, planID int64) (int64, error) {
+	if h == nil || h.scheduledTestSvc == nil {
+		return 0, nil
+	}
+	plan, err := h.scheduledTestSvc.GetPlan(ctx, planID)
+	if err != nil {
+		return 0, err
+	}
+	if plan == nil {
+		return 0, nil
+	}
+	return plan.AccountID, nil
 }
 
 // ListByAccount GET /admin/accounts/:id/scheduled-test-plans

@@ -1,6 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center gap-3">
     <SearchInput
+      v-if="searchable !== false"
       :model-value="searchQuery"
       :placeholder="t('admin.accounts.searchAccounts')"
       class="w-full sm:w-64"
@@ -10,16 +11,28 @@
     <Select :model-value="filters.platform" class="w-40" :options="pOpts" @update:model-value="updatePlatform" @change="$emit('change')" />
     <Select :model-value="filters.type" class="w-40" :options="tOpts" @update:model-value="updateType" @change="$emit('change')" />
     <Select :model-value="filters.status" class="w-40" :options="sOpts" @update:model-value="updateStatus" @change="$emit('change')" />
-    <Select :model-value="filters.privacy_mode" class="w-40" :options="privacyOpts" @update:model-value="updatePrivacyMode" @change="$emit('change')" />
+    <Select v-if="privacyFilter !== false" :model-value="filters.privacy_mode" class="w-40" :options="privacyOpts" @update:model-value="updatePrivacyMode" @change="$emit('change')" />
     <Select :model-value="filters.group" class="w-40" :options="gOpts" @update:model-value="updateGroup" @change="$emit('change')" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'; import { useI18n } from 'vue-i18n'; import Select from '@/components/common/Select.vue'; import SearchInput from '@/components/common/SearchInput.vue'
-import type { AdminGroup } from '@/types'
+import type { Group } from '@/types'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
-const props = defineProps<{ searchQuery: string; filters: Record<string, any>; groups?: AdminGroup[] }>()
+// Only `id` and `name` are read here, so the plain Group shape is enough: viewers
+// without admin group access supply the groups they are allowed to see.
+// `searchable` is off for viewers whose account names arrive masked — a name
+// filter they cannot see the results of would only serve to unmask them.
+// `privacyFilter` is off where the endpoint does not honour it, so the row of
+// selects never offers a control that silently does nothing.
+const props = defineProps<{
+  searchQuery: string
+  filters: Record<string, any>
+  groups?: Group[]
+  searchable?: boolean
+  privacyFilter?: boolean
+}>()
 const emit = defineEmits(['update:searchQuery', 'update:filters', 'change']); const { t } = useI18n()
 const updatePlatform = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, platform: value }) }
 const updateType = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, type: value }) }

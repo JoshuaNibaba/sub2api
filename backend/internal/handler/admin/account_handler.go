@@ -815,16 +815,12 @@ func (h *AccountHandler) List(c *gin.Context) {
 	restrictedViewer, viewerUserID := restrictedAccountViewer(c)
 	for i := range accounts {
 		acc := &accounts[i]
+		// Masking is applied once, after enrichment, in the single restricted
+		// viewer pass below. Doing it here as well only made it harder to audit
+		// which fields actually survive for a non-owned account.
 		accountResponse := h.accountResponseFromService(acc)
-		if restrictedViewer && !acc.IsOwnedBy(viewerUserID) {
-			accountResponse = dto.AccountFromServiceMasked(acc)
-		}
 		if lite {
-			if restrictedViewer && !acc.IsOwnedBy(viewerUserID) {
-				accountResponse = dto.AccountFromServiceMasked(acc)
-			} else {
-				accountResponse = h.accountListResponseFromService(acc)
-			}
+			accountResponse = h.accountListResponseFromService(acc)
 			if h.isSimpleMode() {
 				accountResponse.GroupIDs = filterSimpleModeGroupIDs(accountResponse.GroupIDs, simpleModeCompositeServiceGroupIDs(acc))
 			}
@@ -864,9 +860,23 @@ func (h *AccountHandler) List(c *gin.Context) {
 	h.enrichShadowParents(c.Request.Context(), result)
 	if restrictedViewer {
 		for i := range result {
-			if result[i].Account == nil || result[i].OwnerUserID == nil || *result[i].OwnerUserID != viewerUserID {
-				result[i].Account = dto.AccountFromServiceMasked(&accounts[i])
+			if result[i].Account != nil && result[i].OwnerUserID != nil && *result[i].OwnerUserID == viewerUserID {
+				continue
 			}
+			masked := dto.AccountFromServiceMasked(&accounts[i])
+			if h.isSimpleMode() {
+				masked.GroupIDs = filterSimpleModeGroupIDs(masked.GroupIDs, simpleModeCompositeServiceGroupIDs(&accounts[i]))
+			}
+			result[i].Account = masked
+			// The wrapper fields live outside dto.Account, so replacing the
+			// embedded account is not enough: scheduler internals, window cost,
+			// session counts and RPM would still describe how much traffic
+			// somebody else's account is carrying. Capacity usage stays.
+			result[i].SchedulerScore = nil
+			result[i].SchedulerScores = nil
+			result[i].CurrentWindowCost = nil
+			result[i].ActiveSessions = nil
+			result[i].CurrentRPM = nil
 		}
 	}
 
@@ -925,13 +935,12 @@ func (h *AccountHandler) EnterprisePool(c *gin.Context) {
 	}
 	platform := strings.TrimSpace(c.Query("platform"))
 	accountType := strings.TrimSpace(c.Query("type"))
+	// No implied status filter: this is the real pool, so an empty filter means
+	// every account the admin page would list, including rate-limited and
+	// errored ones. Hiding them would make the customer's view of capacity
+	// disagree with the operator's for no security benefit — status is public
+	// in this projection anyway.
 	status := strings.TrimSpace(c.Query("status"))
-	if status == "" {
-		// Keep the account-pool contract focused on schedulable/active entries by
-		// default, while allowing the canonical table status filter to opt into a
-		// specific status without exposing any admin-only fields.
-		status = service.StatusActive
-	}
 	groupID := int64(0)
 	if groupQuery := strings.TrimSpace(c.Query("group")); groupQuery != "" {
 		if groupQuery == accountListGroupUngroupedQueryValue {
@@ -950,9 +959,19 @@ func (h *AccountHandler) EnterprisePool(c *gin.Context) {
 	if sortOrder != "desc" {
 		sortOrder = "asc"
 	}
-	search := strings.TrimSpace(c.Query("search"))
-	if len([]rune(search)) > 100 {
-		search = string([]rune(search)[:100])
+
+	role, viewerUserID := accountViewer(c)
+	fullAccess := service.IsSuperAdminRole(role)
+	// Account names are masked in this projection, so honouring a name search
+	// would turn the endpoint into an existence oracle: an enterprise user
+	// could recover a masked name character by character. Staff keep the
+	// filter because they can already read names on /admin/accounts.
+	search := ""
+	if service.IsStaffRole(role) {
+		search = strings.TrimSpace(c.Query("search"))
+		if len([]rune(search)) > 100 {
+			search = string([]rune(search)[:100])
+		}
 	}
 
 	accounts, total, err := h.adminService.ListAccounts(
@@ -964,14 +983,44 @@ func (h *AccountHandler) EnterprisePool(c *gin.Context) {
 		return
 	}
 
-	role, viewerUserID := accountViewer(c)
-	fullAccess := service.IsSuperAdminRole(role)
-	now := time.Now()
-	out := make([]dto.EnterpriseAccountPoolItem, 0, len(accounts))
-	for i := range accounts {
-		if item := dto.EnterpriseAccountPoolFromService(&accounts[i], now, viewerUserID, fullAccess); item != nil {
-			out = append(out, *item)
+	// The enterprise pool is the same table the account page always rendered,
+	// so it answers with the canonical account-list envelope. Rows the viewer
+	// does not own go through the masked projection; capacity usage is kept
+	// because "is this account busy" is the point of the pool view, while
+	// scheduler scores, window cost, session counts and RPM stay admin-only.
+	concurrencyCounts := make(map[int64]int)
+	if h.concurrencyService != nil {
+		accountIDs := make([]int64, len(accounts))
+		for i := range accounts {
+			accountIDs[i] = accounts[i].ID
 		}
+		if cc, ccErr := h.concurrencyService.GetAccountConcurrencyBatch(c.Request.Context(), accountIDs); ccErr == nil && cc != nil {
+			concurrencyCounts = cc
+		}
+	}
+	out := make([]AccountListItemWithConcurrency, 0, len(accounts))
+	for i := range accounts {
+		acc := &accounts[i]
+		var item *dto.Account
+		// Enterprise users never get the unmasked projection, not even for an
+		// account a super administrator assigned to them: names and proxies
+		// stay redacted for customers. Staff fall back to their own ownership
+		// rules so this endpoint can never show them more than /admin/accounts.
+		if fullAccess || (service.IsStaffRole(role) && acc.IsOwnedBy(viewerUserID)) {
+			item = h.accountListResponseFromService(acc)
+		} else {
+			item = dto.AccountFromServiceMasked(acc)
+		}
+		if item == nil {
+			continue
+		}
+		if h.isSimpleMode() {
+			item.GroupIDs = filterSimpleModeGroupIDs(item.GroupIDs, simpleModeCompositeServiceGroupIDs(acc))
+		}
+		out = append(out, AccountListItemWithConcurrency{
+			AccountListItem:    dto.AccountListItemFromAccount(item),
+			CurrentConcurrency: concurrencyCounts[acc.ID],
+		})
 	}
 	response.Paginated(c, out, total, page, pageSize)
 }

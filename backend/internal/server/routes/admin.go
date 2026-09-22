@@ -456,6 +456,7 @@ func registerAnnouncementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 func registerOpenAIOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	openai := admin.Group("/openai")
 	openai.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
+	openai.Use(middleware.RequireOwnedAccountParam(h.Admin.Account))
 	{
 		openai.POST("/generate-auth-url", h.Admin.OpenAIOAuth.GenerateAuthURL)
 		openai.POST("/exchange-code", h.Admin.OpenAIOAuth.ExchangeCode)
@@ -492,6 +493,7 @@ func registerAntigravityOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers)
 func registerGrokOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	grok := admin.Group("/grok")
 	grok.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
+	grok.Use(middleware.RequireOwnedAccountParam(h.Admin.Account))
 	{
 		grok.GET("/oauth/capabilities", h.Admin.GrokOAuth.GetCapabilities)
 		grok.POST("/oauth/auth-url", h.Admin.GrokOAuth.GenerateAuthURL)
@@ -513,6 +515,7 @@ func registerGrokOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 func registerCNProviderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	cn := admin.Group("/cn-providers")
 	cn.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
+	cn.Use(middleware.RequireOwnedAccountParam(h.Admin.Account))
 	{
 		// Coding Plan 滚动窗口用量（kimi/zhipu coding 账号）。
 		cn.GET("/accounts/:id/quota", h.Admin.CNProvider.QueryQuota)
@@ -748,10 +751,16 @@ func registerScheduledTestRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		plans.POST("", h.Admin.ScheduledTest.Create)
 		plans.PUT("/:id", h.Admin.ScheduledTest.Update)
 		plans.DELETE("/:id", h.Admin.ScheduledTest.Delete)
-		plans.GET("/:id/results", h.Admin.ScheduledTest.ListResults)
+		plans.GET("/:id/results",
+			middleware.RequireOwnedAccountVia(h.Admin.ScheduledTest.AccountIDForPlan, h.Admin.Account),
+			h.Admin.ScheduledTest.ListResults)
 	}
-	// Nested under accounts
-	admin.GET("/accounts/:id/scheduled-test-plans", h.Admin.ScheduledTest.ListByAccount)
+	// Nested under accounts: registered outside the /accounts group, so it needs
+	// the ownership guard explicitly.
+	admin.GET("/accounts/:id/scheduled-test-plans",
+		middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminAccountsWrite),
+		middleware.RequireOwnedAccountParam(h.Admin.Account),
+		h.Admin.ScheduledTest.ListByAccount)
 }
 
 func registerErrorPassthroughRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

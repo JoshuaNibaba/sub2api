@@ -704,66 +704,46 @@ func ScopedUsageLogFromService(l *service.UsageLog, viewerUserID int64) *ScopedU
 	}
 }
 
-// EnterpriseAccountPoolFromService maps an account to the intentionally
-// redacted enterprise account-pool contract. Keep this mapper independent of
-// AccountFromService so adding admin fields can never widen this API.
-func EnterpriseAccountPoolFromService(a *service.Account, now time.Time, viewerUserID int64, fullAccess bool) *EnterpriseAccountPoolItem {
-	if a == nil {
-		return nil
-	}
-	rateLimited := a.RateLimitedAt != nil && (a.RateLimitResetAt == nil || a.RateLimitResetAt.After(now))
-	temporarilyDisabled := a.TempUnschedulableUntil != nil && a.TempUnschedulableUntil.After(now)
-	health := "healthy"
-	switch {
-	case !a.Schedulable || a.Status != service.StatusActive:
-		health = "unavailable"
-	case rateLimited || temporarilyDisabled:
-		health = "degraded"
-	}
-	owned := fullAccess || a.IsOwnedBy(viewerUserID)
-	name := a.Name
-	if !owned {
-		name = maskAccountName(name)
-	}
-	return &EnterpriseAccountPoolItem{
-		ID:                  a.ID,
-		Name:                name,
-		OwnedByViewer:       owned,
-		Platform:            a.Platform,
-		Type:                a.Type,
-		Status:              a.Status,
-		Schedulable:         a.Schedulable,
-		Concurrency:         a.Concurrency,
-		LoadFactor:          a.LoadFactor,
-		GroupIDs:            append([]int64(nil), a.GroupIDs...),
-		LastUsedAt:          a.LastUsedAt,
-		RateLimited:         rateLimited,
-		TemporarilyDisabled: temporarilyDisabled,
-		Health:              health,
-	}
-}
-
-// AccountFromServiceMasked is the safe projection for an account that is not
-// owned by the current administrator/enterprise user. It keeps operational
-// basics while removing credentials, proxy details, notes, error text, groups
-// and provider-specific extras.
+// AccountFromServiceMasked is the account-pool projection: the view of an
+// account for a viewer who does not own it. Restricted administrators get it
+// for shared and other administrators' accounts, and enterprise users get it
+// for the whole pool, so both see the real pool on the canonical account page
+// instead of a separate, thinner screen.
+//
+// It keeps the operational state that page renders — platform, type, status,
+// schedulability, capacity, group membership, expiry and the rate-limit /
+// session-window timers — and drops everything that identifies, authenticates
+// or prices the account: the full name (partially masked), owner, notes,
+// proxy, credentials, provider extras, raw error text and billing multiplier.
+// Keep this mapper independent of AccountFromService so that adding an admin
+// field can never widen this projection by accident.
 func AccountFromServiceMasked(a *service.Account) *Account {
 	if a == nil {
 		return nil
 	}
 	return &Account{
-		ID:          a.ID,
-		Name:        maskAccountName(a.Name),
-		Platform:    a.Platform,
-		Type:        a.Type,
-		Status:      a.Status,
-		Concurrency: a.Concurrency,
-		LoadFactor:  a.LoadFactor,
-		Priority:    a.Priority,
-		Schedulable: a.Schedulable,
-		LastUsedAt:  a.LastUsedAt,
-		CreatedAt:   a.CreatedAt,
-		UpdatedAt:   a.UpdatedAt,
+		ID:                     a.ID,
+		Name:                   maskAccountName(a.Name),
+		Platform:               a.Platform,
+		Type:                   a.Type,
+		Status:                 a.Status,
+		Concurrency:            a.Concurrency,
+		LoadFactor:             a.LoadFactor,
+		Priority:               a.Priority,
+		Schedulable:            a.Schedulable,
+		GroupIDs:               append([]int64(nil), a.GroupIDs...),
+		LastUsedAt:             a.LastUsedAt,
+		ExpiresAt:              timeToUnixSeconds(a.ExpiresAt),
+		AutoPauseOnExpired:     a.AutoPauseOnExpired,
+		RateLimitedAt:          a.RateLimitedAt,
+		RateLimitResetAt:       a.RateLimitResetAt,
+		OverloadUntil:          a.OverloadUntil,
+		TempUnschedulableUntil: a.TempUnschedulableUntil,
+		SessionWindowStart:     a.SessionWindowStart,
+		SessionWindowEnd:       a.SessionWindowEnd,
+		SessionWindowStatus:    a.SessionWindowStatus,
+		CreatedAt:              a.CreatedAt,
+		UpdatedAt:              a.UpdatedAt,
 	}
 }
 

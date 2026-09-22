@@ -1159,9 +1159,10 @@ export interface OllamaCloudUsageSettings {
 export interface Account {
   id: number
   name: string
+  // Absent on rows the backend redacted: a viewer who may not read an account's
+  // owner also receives a masked name and no proxy, credentials, notes or
+  // billing multiplier. `owner_user_id == null` is how the table recognises one.
   owner_user_id?: number | null
-  /** Safe enterprise account-pool projection adapted to the full table layout. */
-  enterprise_redacted?: boolean
   notes?: string | null
   platform: AccountPlatform
   type: AccountType

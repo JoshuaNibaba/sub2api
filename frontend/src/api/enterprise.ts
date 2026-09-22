@@ -1,21 +1,18 @@
 import { apiClient } from './client'
-import type { PaginatedResponse, UsageLog, UsageQueryParams, UserErrorRequest } from '@/types'
+import type { AccountListItem, PaginatedResponse, UsageLog, UsageQueryParams, UserErrorRequest } from '@/types'
 
-export interface EnterpriseAccountPoolItem {
-  id: number
-  name: string
-  owned_by_viewer: boolean
-  platform: string
-  type: string
-  status: string
-  schedulable: boolean
-  concurrency: number
-  load_factor?: number | null
-  group_ids?: number[]
-  last_used_at?: string | null
-  rate_limited: boolean
-  temporarily_disabled: boolean
-  health: 'healthy' | 'degraded' | 'unavailable' | string
+/**
+ * The account pool is the real account table, not a separate screen: the
+ * endpoint answers with the same rows `GET /admin/accounts?lite=1` returns, so
+ * the account page can render enterprise viewers without inventing values.
+ *
+ * Rows the viewer does not own arrive redacted by the backend — the name is
+ * partially masked and proxy, credentials, notes, raw errors and the billing
+ * multiplier are absent. Redacted rows are recognised by the missing
+ * `owner_user_id`; the frontend must not try to reconstruct what was dropped.
+ */
+export type EnterpriseAccountPoolItem = AccountListItem & {
+  current_concurrency?: number
 }
 
 export interface EnterpriseAccountPoolParams {
@@ -27,7 +24,6 @@ export interface EnterpriseAccountPoolParams {
   group?: string
   sort_by?: string
   sort_order?: 'asc' | 'desc'
-  search?: string
 }
 
 export interface ScopedUsageLog extends UsageLog {

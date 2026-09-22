@@ -55,7 +55,16 @@ vi.mock('@/stores/app', () => ({
 }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ token: 'test-token' })
+  // These specs exercise the account table as a super administrator: nothing is
+  // redacted and every row action is available.
+  useAuthStore: () => ({
+    token: 'test-token',
+    isSimpleMode: false,
+    isAdmin: true,
+    isSuperAdmin: true,
+    user: { id: 1 },
+    hasPermission: () => false
+  })
 }))
 
 vi.mock('vue-i18n', async () => {

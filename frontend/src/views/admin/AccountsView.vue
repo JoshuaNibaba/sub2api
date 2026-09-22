@@ -6,7 +6,9 @@
           <AccountTableFilters
             v-model:searchQuery="params.search"
             :filters="params"
-            :groups="groups"
+            :groups="filterGroups"
+            :searchable="!enterpriseReadOnly"
+            :privacy-filter="!enterpriseReadOnly"
             @update:filters="(newFilters) => Object.assign(params, newFilters)"
             @change="debouncedReload"
             @update:searchQuery="debouncedReload"
@@ -348,7 +350,7 @@
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :title="t('admin.accounts.fallbackActiveTip', { origin: row.proxy_fallback_origin_name })">
                   {{ t('admin.accounts.fallbackActive') }}
                 </span>
-                <button v-if="!restrictedAdmin" class="text-xs px-1.5 py-0.5 rounded border border-gray-300 dark:border-dark-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700" @click="onRevertFallback(row)">{{ t('admin.accounts.revertProxy') }}</button>
+                <button v-if="canMutateAccount(row)" class="text-xs px-1.5 py-0.5 rounded border border-gray-300 dark:border-dark-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700" @click="onRevertFallback(row)">{{ t('admin.accounts.revertProxy') }}</button>
               </div>
             </div>
           </template>
@@ -447,7 +449,7 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                 <span class="text-xs">{{ t('common.delete') }}</span>
               </button>
-              <button v-if="!restrictedAdmin" @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white">
+              <button @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
                 <span class="text-xs">{{ t('common.more') }}</span>
               </button>
@@ -466,7 +468,7 @@
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
-    <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
+    <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" :credential-actions="!restrictedAdmin" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
     <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
     <ImportDataModal :show="showImportData" @close="showImportData = false" @imported="handleDataImported" />
     <BulkEditAccountModal
@@ -503,7 +505,8 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
-import { enterpriseAPI, type EnterpriseAccountPoolItem } from '@/api'
+import { enterpriseAPI, userGroupsAPI } from '@/api'
+import { Permission } from '@/utils/permissions'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
@@ -544,73 +547,58 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
-import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
+import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, Group, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
-const enterpriseReadOnly = computed(() => !authStore.isAdmin && (authStore.hasPermission?.('enterprise.account_pool.read') ?? false))
+// Enterprise customers browse the real account pool on this page rather than a
+// separate screen. Everything they see is read-only and already redacted by the
+// backend, so the flags below only decide what the UI offers — the API enforces
+// the same boundaries independently.
+const enterpriseReadOnly = computed(
+  () => !authStore.isAdmin && authStore.hasPermission(Permission.EnterpriseAccountPool)
+)
 const restrictedAdmin = computed(() => authStore.isAdmin && !authStore.isSuperAdmin)
+const ownsAccount = (row: Pick<AccountListItem, 'owner_user_id'>) =>
+  row.owner_user_id != null && row.owner_user_id === authStore.user?.id
 const canMutateAccount = (row: Pick<AccountListItem, 'owner_user_id'>) => {
   if (enterpriseReadOnly.value) return false
   if (!restrictedAdmin.value) return true
-  return row.owner_user_id === authStore.user?.id
+  return ownsAccount(row)
 }
-const isRedactedAccount = (row: Pick<AccountListItem, 'owner_user_id'> & { enterprise_redacted?: boolean }) => {
-  if (row.enterprise_redacted === true) return true
-  return restrictedAdmin.value && row.owner_user_id !== authStore.user?.id
+// A redacted row arrives without an owner: the backend dropped its full name,
+// proxy, credentials and billing multiplier, so those cells must render as
+// unavailable instead of showing a default that looks like real data.
+const isRedactedAccount = (row: Pick<AccountListItem, 'owner_user_id'>) => {
+  if (enterpriseReadOnly.value) return true
+  return restrictedAdmin.value && !ownsAccount(row)
 }
-const canQueryAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'> & { enterprise_redacted?: boolean }) => {
+const canQueryAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'>) => {
   if (enterpriseReadOnly.value) return false
   if (!restrictedAdmin.value) return true
-  return row.owner_user_id === authStore.user?.id
+  return ownsAccount(row)
 }
-const canProbeAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'> & { enterprise_redacted?: boolean }) => {
-  return !enterpriseReadOnly.value && !restrictedAdmin.value && canQueryAccountOperationalData(row)
-}
-
-const enterprisePoolToAccount = (item: EnterpriseAccountPoolItem): AccountListItem => ({
-  id: item.id,
-  name: item.name,
-  platform: item.platform as AccountPlatform,
-  type: item.type as AccountType,
-  status: item.status as Account['status'],
-  concurrency: item.concurrency,
-  load_factor: item.load_factor ?? null,
-  last_used_at: item.last_used_at ?? null,
-  schedulable: item.schedulable,
-  group_ids: item.group_ids ?? [],
-  notes: null,
-  credentials: {},
-  credentials_status: {},
-  extra: {},
-  proxy_id: null,
-  priority: 0,
-  rate_multiplier: 1,
-  error_message: null,
-  expires_at: null,
-  auto_pause_on_expired: true,
-  created_at: '',
-  updated_at: '',
-  rate_limited_at: null,
-  rate_limit_reset_at: null,
-  overload_until: null,
-  temp_unschedulable_until: null,
-  temp_unschedulable_reason: null,
-  session_window_start: null,
-  session_window_end: null,
-  session_window_status: null,
-  owner_user_id: item.owned_by_viewer ? authStore.user?.id ?? null : null,
-  enterprise_redacted: true,
-})
+// Probes hit the upstream provider with the account's own credentials, so they
+// follow the same rule as any other per-account action: owners only.
+const canProbeAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'>) =>
+  canQueryAccountOperationalData(row)
 
 const proxies = ref<AccountProxy[]>([])
 const groups = ref<AdminGroup[]>([])
-const groupsByID = computed(() => new Map(groups.value.map(group => [group.id, group])))
-const accountGroupsForRow = (account: Pick<AccountListItem, 'group_ids'>): AdminGroup[] => {
+// Enterprise viewers cannot read /admin/groups, but the pool rows carry
+// group_ids, so the group column and filter would render empty ids without a
+// source of names. They get the groups they are entitled to from
+// /groups/available, which is the plain Group shape.
+const availableGroups = ref<Group[]>([])
+const filterGroups = computed<Group[]>(() =>
+  enterpriseReadOnly.value ? availableGroups.value : groups.value
+)
+const groupsByID = computed(() => new Map<number, Group>(filterGroups.value.map(group => [group.id, group])))
+const accountGroupsForRow = (account: Pick<AccountListItem, 'group_ids'>): Group[] => {
   const groupIDs = account.group_ids ?? []
   if (groupIDs.length === 0) return []
-  return groupIDs.map(id => groupsByID.value.get(id)).filter((group): group is AdminGroup => Boolean(group))
+  return groupIDs.map(id => groupsByID.value.get(id)).filter((group): group is Group => Boolean(group))
 }
 const accountTableRef = ref<HTMLElement | null>(null)
 const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
@@ -1147,7 +1135,9 @@ const {
 } = useTableLoader<AccountListItem, any>({
   fetchFn: async (page, pageSize, filters, options) => {
     if (enterpriseReadOnly.value) {
-      const result = await enterpriseAPI.listAccountPool({
+      // Same rows as the admin list, already redacted server-side. No `search`:
+      // names are masked, so a name filter would only serve to unmask them.
+      return enterpriseAPI.listAccountPool({
         page,
         page_size: pageSize,
         platform: typeof filters.platform === 'string' ? filters.platform : undefined,
@@ -1156,12 +1146,7 @@ const {
         group: typeof filters.group === 'string' ? filters.group : undefined,
         sort_by: typeof filters.sort_by === 'string' ? filters.sort_by : undefined,
         sort_order: filters.sort_order === 'desc' ? 'desc' : 'asc',
-        search: typeof filters.search === 'string' ? filters.search : undefined,
       })
-      return {
-        ...result,
-        items: result.items.map(enterprisePoolToAccount),
-      }
     }
     return adminAPI.accounts.list(page, pageSize, filters, options)
   },
@@ -1246,20 +1231,20 @@ const load = async (options: AccountLoadOptions = {}) => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
-	requestParams.lite = '1'
-	await baseLoad()
-	if (enterpriseReadOnly.value) return
-	if (options.refreshTodayStats !== false) await refreshTodayStatsBatch()
+  requestParams.lite = '1'
+  await baseLoad()
+  if (enterpriseReadOnly.value) return
+  if (options.refreshTodayStats !== false) await refreshTodayStatsBatch()
 }
 
 const reload = async () => {
   syncAccountListDerivedParams()
   hasPendingListSync.value = false
-	resetAutoRefreshCache()
-	pendingTodayStatsRefresh.value = false
-	await baseReload()
-	if (enterpriseReadOnly.value) return
-	await refreshTodayStatsBatch()
+  resetAutoRefreshCache()
+  pendingTodayStatsRefresh.value = false
+  await baseReload()
+  if (enterpriseReadOnly.value) return
+  await refreshTodayStatsBatch()
 }
 
 const buildUpstreamBillingRateFilters = () => {
@@ -1872,6 +1857,20 @@ function getAntigravityTierClass(row: any): string {
   }
 }
 
+// Columns that carry nothing for a read-only enterprise viewer, either because
+// the field is redacted server-side or because filling it needs a staff-only
+// endpoint. Kept next to allColumns so the two stay in step.
+const enterpriseHiddenColumnKeys = new Set([
+  'select',
+  'today_stats',
+  'proxy',
+  'scheduler_score',
+  'rate_multiplier',
+  'upstream_billing_rate',
+  'notes',
+  'actions'
+])
+
 // All available columns
 const allColumns = computed(() => {
   const c = [
@@ -1900,6 +1899,13 @@ const allColumns = computed(() => {
     { key: 'notes', label: t('admin.accounts.columns.notes'), sortable: false },
     { key: 'actions', label: t('admin.accounts.columns.actions'), sortable: false }
   )
+  if (enterpriseReadOnly.value) {
+    // Drop the columns a customer can never populate instead of offering them
+    // as permanently blank: bulk selection and row actions need write access,
+    // proxy / notes / billing multiplier are redacted out of the projection,
+    // and the stats columns are backed by staff-only usage endpoints.
+    return c.filter(col => !enterpriseHiddenColumnKeys.has(col.key))
+  }
   return c
 })
 
@@ -2624,32 +2630,46 @@ onMounted(async () => {
     } else {
       desktopViewportMediaQuery.addListener(desktopViewportListener)
     }
-	}
+  }
 
-	load()
-	if (enterpriseReadOnly.value) return
-	if (!restrictedAdmin.value) {
-	  loadUpstreamBillingProbeGlobalState()
-	}
-  const [proxiesResult, groupsResult] = await Promise.allSettled([
-    adminAPI.proxies.getAll(),
-    adminAPI.groups.getAll()
-  ])
-  if (proxiesResult.status === 'fulfilled') {
-    proxies.value = proxiesResult.value
+  load()
+
+  if (enterpriseReadOnly.value) {
+    // No proxy list and no admin group list: both are staff-only endpoints, and
+    // the pool rows carry no proxy at all. Group names come from the groups the
+    // customer is entitled to, so the group column and filter stay populated.
+    try {
+      availableGroups.value = await userGroupsAPI.getAvailable()
+    } catch (error) {
+      console.error('Failed to load available groups:', error)
+    }
   } else {
-    console.error('Failed to load proxies:', proxiesResult.reason)
+    if (!restrictedAdmin.value) {
+      loadUpstreamBillingProbeGlobalState()
+    }
+    const [proxiesResult, groupsResult] = await Promise.allSettled([
+      adminAPI.proxies.getAll(),
+      adminAPI.groups.getAll()
+    ])
+    if (proxiesResult.status === 'fulfilled') {
+      proxies.value = proxiesResult.value
+    } else {
+      console.error('Failed to load proxies:', proxiesResult.reason)
+    }
+    if (groupsResult.status === 'fulfilled') {
+      groups.value = groupsResult.value
+    } else {
+      console.error('Failed to load groups:', groupsResult.reason)
+    }
   }
-  if (groupsResult.status === 'fulfilled') {
-    groups.value = groupsResult.value
-  } else {
-    console.error('Failed to load groups:', groupsResult.reason)
-  }
+
   window.addEventListener('scroll', handleScroll, true)
   window.addEventListener('resize', handleViewportResize)
   document.addEventListener('click', handleClickOutside)
 
-  if (autoRefreshEnabled.value) {
+  // The auto-refresh control is staff-only, so a customer must not be left with
+  // a timer they have no way to switch off.
+  if (autoRefreshEnabled.value && !enterpriseReadOnly.value) {
     autoRefreshCountdown.value = autoRefreshIntervalSeconds.value
     resumeAutoRefresh()
   } else {
