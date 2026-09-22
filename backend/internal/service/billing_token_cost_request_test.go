@@ -217,7 +217,10 @@ func TestCalculateTokenCostForRequest_NoResolverFallsBackToCatalog(t *testing.T)
 	require.Equal(t, want, got)
 }
 
-func TestCalculateTokenCostForRequest_Fable51MaxEffortUsesDefaultMultiplier(t *testing.T) {
+func TestCalculateTokenCostForRequest_Fable51MaxEffortIsNotSurcharged(t *testing.T) {
+	// 上游按 token 计价：effort 调高只会多出思考 token，那些 token 已计入
+	// output_tokens。再乘一个倍率等于对同一批 token 收两遍，正是 Fable 5.1
+	// 被按 3 倍计费的原因。
 	bs := NewBillingService(&config.Config{}, nil)
 	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 10}
 	standard, err := bs.CalculateTokenCostForRequest(TokenCostRequest{
@@ -228,13 +231,14 @@ func TestCalculateTokenCostForRequest_Fable51MaxEffortUsesDefaultMultiplier(t *t
 		Model: "claude-fable-5-1", Tokens: tokens, RateMultiplier: 1, ReasoningEffort: "max",
 	})
 	require.NoError(t, err)
-	require.InDelta(t, standard.TotalCost*3, max.TotalCost, 1e-12)
-	require.InDelta(t, standard.ActualCost*3, max.ActualCost, 1e-12)
-	require.InDelta(t, standard.InputCost*3, max.InputCost, 1e-12)
-	require.InDelta(t, standard.OutputCost*3, max.OutputCost, 1e-12)
+	require.InDelta(t, standard.TotalCost, max.TotalCost, 1e-12)
+	require.InDelta(t, standard.ActualCost, max.ActualCost, 1e-12)
+	// 官方价卡：$10/$50 per MTok，与 effort 无关。
+	require.InDelta(t, 1000*10e-6, max.InputCost, 1e-12)
+	require.InDelta(t, 10*50e-6, max.OutputCost, 1e-12)
 }
 
-func TestCalculateTokenCostForRequest_ChannelOverridesFable51MaxEffortMultiplier(t *testing.T) {
+func TestCalculateTokenCostForRequest_ChannelConfiguredMaxEffortMultiplier(t *testing.T) {
 	configured := 1.5
 	bs, resolver := newTokenCostTestEnv(t, PlatformAnthropic, []ChannelModelPricing{{
 		Platform: PlatformAnthropic, Models: []string{"claude-fable-5-1"}, BillingMode: BillingModeToken,

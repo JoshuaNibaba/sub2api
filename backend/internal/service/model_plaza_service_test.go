@@ -57,17 +57,21 @@ func TestListPlazaGroups_GroupCentricAggregation(t *testing.T) {
 	require.Equal(t, "claude-sonnet", out[0].Models[1].Name)
 }
 
-func TestWithDefaultMaxReasoningEffortMultiplier_Fable51(t *testing.T) {
-	base := &ChannelModelPricing{BillingMode: BillingModeToken}
-	got := withDefaultMaxReasoningEffortMultiplier(base, "claude-fable-5-1")
-	require.NotSame(t, base, got)
-	require.NotNil(t, got.MaxReasoningEffortMultiplier)
-	require.Equal(t, 3.0, *got.MaxReasoningEffortMultiplier)
-	require.Nil(t, base.MaxReasoningEffortMultiplier)
+func TestFillGlobalPricingFallback_NoSyntheticMaxReasoningMultiplier(t *testing.T) {
+	// Fable 5.1 没有内置 max 推理等级倍率：模型广场不应展示一个运营者
+	// 从未配置过的倍率徽章。
+	models := []SupportedModel{{
+		Name:    "claude-fable-5-1",
+		Pricing: &ChannelModelPricing{BillingMode: BillingModeToken, InputPrice: testPtrFloat64(10e-6)},
+	}}
+	fillGlobalPricingFallback(nil, models)
+	require.Nil(t, models[0].Pricing.MaxReasoningEffortMultiplier)
 
 	configured := 1.25
-	custom := &ChannelModelPricing{MaxReasoningEffortMultiplier: &configured}
-	require.Same(t, custom, withDefaultMaxReasoningEffortMultiplier(custom, "claude-fable-5-1"))
+	models[0].Pricing.MaxReasoningEffortMultiplier = &configured
+	fillGlobalPricingFallback(nil, models)
+	require.NotNil(t, models[0].Pricing.MaxReasoningEffortMultiplier)
+	require.Equal(t, configured, *models[0].Pricing.MaxReasoningEffortMultiplier)
 }
 
 func TestListPlazaGroups_DedupFirstWinsWithPricingUpgrade(t *testing.T) {

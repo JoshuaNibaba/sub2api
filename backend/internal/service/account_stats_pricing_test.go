@@ -478,7 +478,9 @@ func TestTryModelFilePricing_Success(t *testing.T) {
 	require.InDelta(t, 0.2, *result, 1e-12)
 }
 
-func TestTryModelFilePricing_Fable51MaxEffortUsesTripleQuota(t *testing.T) {
+// 上游按 token 计价：max 档只是多出思考 token，那些 token 已计入 output_tokens。
+// 没有显式配置倍率时不得加价，否则同一批 token 会被收两遍。
+func TestTryModelFilePricing_Fable51MaxEffortIsNotSurcharged(t *testing.T) {
 	bs := newTestBillingServiceWithPrices(map[string]*ModelPricing{
 		"claude-fable-5-1": {InputPricePerToken: 0.001},
 	})
@@ -487,7 +489,26 @@ func TestTryModelFilePricing_Fable51MaxEffortUsesTripleQuota(t *testing.T) {
 	max := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, "max")
 	require.NotNil(t, standard)
 	require.NotNil(t, max)
-	require.InDelta(t, *standard*3, *max, 1e-12)
+	require.InDelta(t, 0.1, *standard, 1e-12)
+	require.InDelta(t, *standard, *max, 1e-12)
+}
+
+// 运营者显式配置的 max 推理等级倍率仍然生效。
+func TestTryModelFilePricing_ConfiguredMaxEffortMultiplier(t *testing.T) {
+	multiplier := 1.5
+	bs := newTestBillingServiceWithPrices(map[string]*ModelPricing{
+		"claude-fable-5-1": {
+			InputPricePerToken:           0.001,
+			MaxReasoningEffortMultiplier: &multiplier,
+		},
+	})
+	tokens := UsageTokens{InputTokens: 100}
+	standard := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, "xhigh")
+	max := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, "max")
+	require.NotNil(t, standard)
+	require.NotNil(t, max)
+	require.InDelta(t, 0.1, *standard, 1e-12)
+	require.InDelta(t, 0.15, *max, 1e-12)
 }
 
 func TestTryModelFilePricing_AppliesLongContextPricing(t *testing.T) {
