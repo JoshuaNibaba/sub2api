@@ -223,7 +223,9 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
-import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
+import { enterpriseAPI, keysAPI, usageAPI, userGroupsAPI } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+import { Permission } from '@/utils/permissions'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
@@ -252,11 +254,14 @@ import type {
   UsageStatsResponse,
   UserErrorRequest,
 } from '@/types'
+import type { ScopedUsageLog } from '@/api'
 import type { Column } from '@/components/common/types'
 import { COMMON_ERROR_STATUS_CODES } from '@/utils/errorBadges'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canViewRoutingAccount = computed(() => authStore.hasPermission(Permission.EnterpriseUsage))
 
 type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
@@ -449,9 +454,11 @@ const loadLogs = async () => {
   abortController = controller
   loading.value = true
   try {
-    const res = await usageAPI.query(buildUsageListParams(pagination.page, pagination.page_size), {
-      signal: controller.signal,
-    })
+    const res = canViewRoutingAccount.value
+      ? await enterpriseAPI.listUsageLogs(buildUsageListParams(pagination.page, pagination.page_size))
+      : await usageAPI.query(buildUsageListParams(pagination.page, pagination.page_size), {
+          signal: controller.signal,
+        })
     if (!controller.signal.aborted) {
       usageLogs.value = res.items
       pagination.total = res.total
@@ -644,7 +651,9 @@ const exportToCSV = async () => {
     const exportParams = buildUsageListParams(1, pageSize)
     const totalPages = Math.ceil(pagination.total / pageSize)
     for (let page = 1; page <= totalPages; page++) {
-      const response = await usageAPI.query({ ...exportParams, page })
+      const response = canViewRoutingAccount.value
+        ? await enterpriseAPI.listUsageLogs({ ...exportParams, page })
+        : await usageAPI.query({ ...exportParams, page })
       allLogs.push(...response.items)
     }
     if (allLogs.length === 0) {
@@ -654,6 +663,7 @@ const exportToCSV = async () => {
     const headers = [
       'Time',
       'API Key Name',
+      ...(canViewRoutingAccount.value ? ['Selected Account'] : []),
       'Model',
       'Reasoning Effort',
       'Inbound Endpoint',
@@ -673,6 +683,7 @@ const exportToCSV = async () => {
     const rows = allLogs.map((log) => [
       log.created_at,
       log.api_key?.name || '',
+      ...(canViewRoutingAccount.value ? [(log as ScopedUsageLog).account?.name || '****'] : []),
       log.model,
       formatReasoningEffort(log.reasoning_effort),
       log.inbound_endpoint || '',
@@ -715,6 +726,7 @@ const HIDDEN_COLUMNS_KEY = 'user-usage-hidden-columns'
 
 const allColumns = computed<Column[]>(() => [
   { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
+  ...(canViewRoutingAccount.value ? [{ key: 'account', label: t('enterprise.hitAccount'), sortable: false }] : []),
   { key: 'model', label: t('usage.model'), sortable: true },
   { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
   { key: 'endpoint', label: t('usage.endpoint'), sortable: false },

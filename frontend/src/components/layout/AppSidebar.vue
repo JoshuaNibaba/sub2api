@@ -738,8 +738,8 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    ...(authStore.hasPermission(Permission.EnterpriseAccountPool)
-      ? [{ path: '/enterprise', label: t('nav.enterprise'), icon: GlobeIcon }]
+    ...(!authStore.isAdmin && authStore.hasPermission(Permission.EnterpriseAccountPool)
+      ? [{ path: '/admin/accounts', label: t('enterprise.accountPool'), icon: GlobeIcon }]
       : []),
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },

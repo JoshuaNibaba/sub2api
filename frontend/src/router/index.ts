@@ -242,19 +242,6 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/enterprise',
-    name: 'EnterpriseCenter',
-    component: () => import('@/views/user/EnterpriseView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: false,
-      requiredPermission: Permission.EnterpriseAccountPool,
-      title: 'Enterprise Center',
-      titleKey: 'enterprise.title',
-      descriptionKey: 'enterprise.description'
-    }
-  },
-  {
     path: '/redeem',
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),
@@ -541,8 +528,9 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/admin/AccountsView.vue'),
     meta: {
       requiresAuth: true,
-      requiresAdmin: true,
-      requiredPermission: Permission.AdminAccountsRead,
+      requiresAdmin: false,
+      requiresStaffCompliance: true,
+      requiredAnyPermissions: [Permission.AdminAccountsRead, Permission.EnterpriseAccountPool],
       title: 'Account Management',
       titleKey: 'admin.accounts.title',
       descriptionKey: 'admin.accounts.description'
@@ -938,7 +926,15 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  if (requiresAdmin && authStore.isAdmin) {
+  if (
+    to.meta.requiredAnyPermissions?.length &&
+    !to.meta.requiredAnyPermissions.some((permission) => authStore.hasPermission(permission))
+  ) {
+    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+    return
+  }
+
+  if ((requiresAdmin || to.meta.requiresStaffCompliance) && authStore.isAdmin) {
     const adminComplianceStore = useAdminComplianceStore()
     if (!adminComplianceStore.initialized) {
       try {
