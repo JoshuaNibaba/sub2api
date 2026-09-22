@@ -1,6 +1,30 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
+    <TablePageLayout v-if="enterpriseReadOnly">
+      <template #filters>
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="w-full sm:w-64">
+            <label class="input-label">{{ t('common.search') }}</label>
+            <input v-model="params.search" class="input" :placeholder="t('common.searchPlaceholder')" @input="debouncedReload" />
+          </div>
+          <div class="w-full sm:w-40">
+            <label class="input-label">{{ t('enterprise.platform') }}</label>
+            <select v-model="params.platform" class="input" @change="debouncedReload">
+              <option value="">{{ t('common.all') }}</option>
+              <option v-for="item in enterprisePlatforms" :key="item" :value="item">{{ item }}</option>
+            </select>
+          </div>
+          <button class="btn btn-secondary" :disabled="loading" @click="reload">{{ t('common.refresh') }}</button>
+        </div>
+      </template>
+      <template #table>
+        <DataTable :columns="enterpriseColumns" :data="accounts" :loading="loading" row-key="id" />
+      </template>
+      <template #pagination>
+        <Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="baseHandlePageChange" @update:pageSize="baseHandlePageSizeChange" />
+      </template>
+    </TablePageLayout>
+    <TablePageLayout v-else>
       <template #filters>
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters
@@ -12,11 +36,12 @@
             @update:searchQuery="debouncedReload"
           />
           <AccountTableActions
+            v-if="!enterpriseReadOnly"
             :loading="loading"
             @refresh="handleManualRefresh"
             @create="showCreate = true"
           >
-            <template #after>
+            <template #after v-if="!restrictedAdmin">
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
                 <button
@@ -176,6 +201,7 @@
       </template>
       <template #table>
         <AccountBulkActionsBar
+          v-if="!enterpriseReadOnly && !restrictedAdmin"
           :selected-ids="selIds"
           :total-results="pagination.total"
           :selecting-all="selectingAllResults"
@@ -430,6 +456,8 @@
             </div>
           </template>
           <template #cell-actions="{ row }">
+            <span v-if="enterpriseReadOnly || !canMutateAccount(row)" class="text-sm text-gray-400">-</span>
+            <template v-else>
             <div class="flex items-center gap-1">
               <button @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
@@ -444,12 +472,14 @@
                 <span class="text-xs">{{ t('common.more') }}</span>
               </button>
             </div>
+            </template>
           </template>
         </DataTable>
         </div>
       </template>
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
+    <template v-if="!enterpriseReadOnly">
     <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
     <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
@@ -482,6 +512,7 @@
     <ErrorPassthroughRulesModal :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <TLSFingerprintProfilesModal :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
     <TotpStepUpDialog :controller="accountExportStepUp" />
+    </template>
   </AppLayout>
 </template>
 
@@ -492,6 +523,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
+import { enterpriseAPI, type EnterpriseAccountPoolItem } from '@/api'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
@@ -537,6 +569,54 @@ import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupSc
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const enterpriseReadOnly = computed(() => !authStore.isAdmin && authStore.hasPermission('enterprise.account_pool.read'))
+const restrictedAdmin = computed(() => authStore.isAdmin && !authStore.isSuperAdmin)
+const canMutateAccount = (row: Pick<AccountListItem, 'owner_user_id'>) => {
+  if (!restrictedAdmin.value) return true
+  return row.owner_user_id === authStore.user?.id
+}
+const enterprisePlatforms = ['openai', 'anthropic', 'gemini', 'antigravity', 'grok']
+const enterpriseColumns = computed(() => [
+  { key: 'name', label: t('admin.accounts.columns.name'), sortable: false },
+  { key: 'platform', label: t('enterprise.platform'), sortable: false },
+  { key: 'type', label: t('admin.accounts.accountType'), sortable: false },
+  { key: 'status', label: t('admin.accounts.columns.status'), sortable: false },
+  { key: 'concurrency', label: t('admin.accounts.columns.capacity'), sortable: false },
+  { key: 'last_used_at', label: t('admin.accounts.columns.lastUsed'), sortable: false },
+])
+
+const enterprisePoolToAccount = (item: EnterpriseAccountPoolItem): AccountListItem => ({
+  id: item.id,
+  name: item.name,
+  platform: item.platform as AccountPlatform,
+  type: item.type as AccountType,
+  status: item.status as Account['status'],
+  concurrency: item.concurrency,
+  load_factor: item.load_factor ?? null,
+  last_used_at: item.last_used_at ?? null,
+  schedulable: item.schedulable,
+  group_ids: item.group_ids ?? [],
+  notes: null,
+  credentials: {},
+  credentials_status: {},
+  extra: {},
+  proxy_id: null,
+  priority: 0,
+  rate_multiplier: 1,
+  error_message: null,
+  expires_at: null,
+  auto_pause_on_expired: true,
+  created_at: '',
+  updated_at: '',
+  rate_limited_at: null,
+  rate_limit_reset_at: null,
+  overload_until: null,
+  temp_unschedulable_until: null,
+  temp_unschedulable_reason: null,
+  session_window_start: null,
+  session_window_end: null,
+  session_window_status: null,
+})
 
 const proxies = ref<AccountProxy[]>([])
 const groups = ref<AdminGroup[]>([])
@@ -1077,7 +1157,21 @@ const {
   handlePageChange: baseHandlePageChange,
   handlePageSizeChange: baseHandlePageSizeChange
 } = useTableLoader<AccountListItem, any>({
-  fetchFn: adminAPI.accounts.list,
+  fetchFn: async (page, pageSize, filters, options) => {
+    if (enterpriseReadOnly.value) {
+      const result = await enterpriseAPI.listAccountPool({
+        page,
+        page_size: pageSize,
+        platform: typeof filters.platform === 'string' ? filters.platform : undefined,
+        search: typeof filters.search === 'string' ? filters.search : undefined,
+      })
+      return {
+        ...result,
+        items: result.items.map(enterprisePoolToAccount),
+      }
+    }
+    return adminAPI.accounts.list(page, pageSize, filters, options)
+  },
   initialParams: {
     platform: '',
     type: '',
@@ -1159,18 +1253,20 @@ const load = async (options: AccountLoadOptions = {}) => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
-  requestParams.lite = '1'
-  await baseLoad()
-  if (options.refreshTodayStats !== false) await refreshTodayStatsBatch()
+	requestParams.lite = '1'
+	await baseLoad()
+	if (enterpriseReadOnly.value) return
+	if (options.refreshTodayStats !== false) await refreshTodayStatsBatch()
 }
 
 const reload = async () => {
   syncAccountListDerivedParams()
   hasPendingListSync.value = false
-  resetAutoRefreshCache()
-  pendingTodayStatsRefresh.value = false
-  await baseReload()
-  await refreshTodayStatsBatch()
+	resetAutoRefreshCache()
+	pendingTodayStatsRefresh.value = false
+	await baseReload()
+	if (enterpriseReadOnly.value) return
+	await refreshTodayStatsBatch()
 }
 
 const buildUpstreamBillingRateFilters = () => {
@@ -2530,10 +2626,11 @@ onMounted(async () => {
     } else {
       desktopViewportMediaQuery.addListener(desktopViewportListener)
     }
-  }
+	}
 
-  load()
-  loadUpstreamBillingProbeGlobalState()
+	load()
+	if (enterpriseReadOnly.value) return
+	loadUpstreamBillingProbeGlobalState()
   const [proxiesResult, groupsResult] = await Promise.allSettled([
     adminAPI.proxies.getAll(),
     adminAPI.groups.getAll()

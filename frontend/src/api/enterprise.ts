@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { PaginatedResponse, UserErrorRequest } from '@/types'
+import type { PaginatedResponse, UsageLog, UsageQueryParams, UserErrorRequest } from '@/types'
 
 export interface EnterpriseAccountPoolItem {
   id: number
@@ -24,15 +24,7 @@ export interface EnterpriseAccountPoolParams {
   search?: string
 }
 
-export interface ScopedUsageLog {
-  id: number
-  account_id: number
-  request_id: string
-  model: string
-  input_tokens: number
-  output_tokens: number
-  total_cost: number
-  created_at: string
+export interface ScopedUsageLog extends UsageLog {
   account?: { id: number; name: string } | null
   account_owned_by_user: boolean
 }
@@ -43,7 +35,7 @@ export const enterpriseAPI = {
       .then(({ data }) => data)
   },
 
-  listUsageLogs(params: Record<string, unknown> = {}) {
+  listUsageLogs(params: UsageQueryParams & { sort_by?: string; sort_order?: 'asc' | 'desc' } = {}) {
     return apiClient.get<PaginatedResponse<ScopedUsageLog>>('/enterprise/usage-logs', { params })
       .then(({ data }) => data)
   },

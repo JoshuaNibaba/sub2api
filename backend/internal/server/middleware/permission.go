@@ -34,6 +34,22 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 				AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Permission denied")
 				return
 			}
+			if !service.IsSuperAdminRole(role) {
+				path := c.FullPath()
+				if strings.HasSuffix(path, "/admin/accounts") {
+					c.Next()
+					return
+				}
+				if strings.Contains(path, "/admin/accounts/:id") {
+					if !accountRouteOwnerAllowed(c, resolver) {
+						return
+					}
+					c.Next()
+					return
+				}
+				AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Only owned account details are available")
+				return
+			}
 			if !service.IsSuperAdminRole(role) && strings.HasSuffix(c.FullPath(), "/admin/accounts/data") {
 				AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account export requires a super administrator")
 				return
@@ -78,23 +94,34 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 			AbortWithError(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Account ownership service unavailable")
 			return
 		}
-		accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-		subject, subjectOK := GetAuthSubjectFromContext(c)
-		if err != nil || !subjectOK || subject.UserID <= 0 {
-			AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account ownership could not be verified")
-			return
-		}
-		owned, err := resolver.IsAccountOwnedBy(c.Request.Context(), accountID, subject.UserID)
-		if err != nil {
-			AbortWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Account ownership could not be verified")
-			return
-		}
-		if !owned {
-			AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Only the account owner can modify this account")
+		if !accountRouteOwnerAllowed(c, resolver) {
 			return
 		}
 		c.Next()
 	}
+}
+
+func accountRouteOwnerAllowed(c *gin.Context, resolver AccountOwnershipResolver) bool {
+	if resolver == nil {
+		AbortWithError(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Account ownership service unavailable")
+		return false
+	}
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	subject, subjectOK := GetAuthSubjectFromContext(c)
+	if err != nil || !subjectOK || subject.UserID <= 0 {
+		AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account ownership could not be verified")
+		return false
+	}
+	owned, err := resolver.IsAccountOwnedBy(c.Request.Context(), accountID, subject.UserID)
+	if err != nil {
+		AbortWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Account ownership could not be verified")
+		return false
+	}
+	if !owned {
+		AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Only the account owner can access this account")
+		return false
+	}
+	return true
 }
 
 // RequirePermission enforces a capability after an authentication middleware

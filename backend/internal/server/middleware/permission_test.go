@@ -48,6 +48,21 @@ func TestRequirePermissionUsesRoleMatrix(t *testing.T) {
 	}
 }
 
+func TestEnterpriseRoleCannotEnterAdminPanelPermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyUserRole), service.RoleEnterpriseUser)
+		c.Next()
+	})
+	r.GET("/admin", RequirePermission(service.PermissionAdminPanel), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin", nil))
+	require.Equal(t, http.StatusForbidden, w.Code)
+}
+
 func TestRequireAccountRouteAccessRestrictsAdminMutationsToOwnedAccount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	request := func(owned bool) int {

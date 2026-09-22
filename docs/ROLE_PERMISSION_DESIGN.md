@@ -87,11 +87,11 @@ GET/HEAD 请求检查 read 权限，POST/PUT/PATCH/DELETE 检查 write 权限。
 
 ## 企业只读接口
 
-当前已提供三类专用接口，均位于 `/api/v1/enterprise/*`，不会复用管理员 URL：
+后端保留三类企业范围接口作为权限隔离的数据源，但前端不再新增独立企业页面，而是复用原有的账号管理和用量记录页面：
 
-- `GET /enterprise/account-pool`：分页返回脱敏号池状态、平台和容量信息。
-- `GET /enterprise/usage-logs`：仅返回当前登录用户自己的用量记录。
-- `GET /enterprise/error-logs`：仅返回当前登录用户自己的脱敏错误记录。
+- `GET /enterprise/account-pool`：由原有账号管理页面在企业角色下调用，分页返回脱敏号池状态、平台和容量信息。
+- `GET /enterprise/usage-logs`：由原有用户用量页面调用，仅返回当前登录用户自己的用量记录，并带上脱敏命中账号。
+- `GET /enterprise/error-logs`：由原有用户用量页面调用，仅返回当前登录用户自己的脱敏错误记录。
 
 这些接口的后端权限分别是 `enterprise.account_pool.read`、`enterprise.usage.read` 和
 `enterprise.logs.read`。前端菜单和路由只负责体验，后端权限检查和数据范围检查始终有效。

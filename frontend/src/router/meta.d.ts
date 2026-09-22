@@ -19,8 +19,14 @@ declare module 'vue-router' {
      */
     requiresAdmin?: boolean
 
+    /** Staff compliance gate applies even when a shared route also serves enterprise users. */
+    requiresStaffCompliance?: boolean
+
     /** Capability required to enter this route. */
     requiredPermission?: string
+
+    /** At least one of these capabilities is required to enter the route. */
+    requiredAnyPermissions?: string[]
 
     /** Whether this route is restricted to the full super administrator. */
     requiresSuperAdmin?: boolean
