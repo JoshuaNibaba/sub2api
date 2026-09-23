@@ -50,6 +50,28 @@ func (p *Proxy) URL() string {
 	return u.String()
 }
 
+// RedactProxyURLForLog 去掉代理 URL 里的 userinfo，只留 scheme://host:port，
+// 并在存在凭证时保留一个 ***@ 标记，便于排障时判断"这个代理是带认证的"。
+// 日志侧必须走它：代理账号密码不属于可落盘的诊断信息。
+func RedactProxyURLForLog(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		// 解析不了就别猜，直接抹掉，宁可少信息也不泄露。
+		return "[unparsable-proxy-url-redacted]"
+	}
+	hadCredentials := u.User != nil
+	u.User = nil
+	u.RawQuery = ""
+	u.Fragment = ""
+	if hadCredentials {
+		return u.Scheme + "://***@" + u.Host
+	}
+	return u.String()
+}
+
 type ProxyWithAccountCount struct {
 	Proxy
 	AccountCount   int64
