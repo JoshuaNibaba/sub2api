@@ -96,6 +96,7 @@ import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from '@/composables/useStepUp'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
+import { roleLabelKey } from '@/utils/permissions'
 
 const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
@@ -104,16 +105,16 @@ const { t } = useI18n(); const appStore = useAppStore(); const authStore = useAu
 const submitting = ref(false); const passwordCopied = ref(false)
 const roleOptions = computed(() => {
   const options = [
-    { value: 'user', label: t('admin.users.roles.user') },
-    { value: 'enterprise_user', label: t('admin.users.roles.enterpriseUser') },
+    { value: 'user', label: t(roleLabelKey('user')) },
+    { value: 'enterprise_user', label: t(roleLabelKey('enterprise_user')) },
   ]
   if (authStore.hasPermission('admin.users.role_manage')) {
     options.push(
-      { value: 'admin', label: t('admin.users.roles.admin') },
-      { value: 'super_admin', label: t('admin.users.roles.superAdmin') },
+      { value: 'admin', label: t(roleLabelKey('admin')) },
+      { value: 'super_admin', label: t(roleLabelKey('super_admin')) },
     )
   } else if (props.user && (props.user.role === 'admin' || props.user.role === 'super_admin')) {
-    options.push({ value: props.user.role, label: t(`admin.users.roles.${props.user.role === 'super_admin' ? 'superAdmin' : 'admin'}`) })
+    options.push({ value: props.user.role, label: t(roleLabelKey(props.user.role)) })
   }
   return options
 })

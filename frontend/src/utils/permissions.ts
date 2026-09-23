@@ -73,3 +73,16 @@ export function isStaffRole(role: string | undefined): boolean {
 export function isSuperAdminRole(role: string | undefined): boolean {
   return role === 'super_admin'
 }
+
+// 后端角色值是 snake_case，i18n 键是 camelCase；缺少映射会把原始键直接显示出来。
+const ROLE_I18N_KEYS: Record<UserRole, string> = {
+  super_admin: 'superAdmin',
+  admin: 'admin',
+  enterprise_user: 'enterpriseUser',
+  user: 'user',
+}
+
+/** 返回 admin.users.roles.* 下的完整 i18n 键；未知角色回退到「用户」。 */
+export function roleLabelKey(role: string | undefined): string {
+  return `admin.users.roles.${ROLE_I18N_KEYS[role as UserRole] ?? ROLE_I18N_KEYS.user}`
+}

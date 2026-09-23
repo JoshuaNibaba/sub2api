@@ -339,8 +339,8 @@
           </template>
 
           <template #cell-role="{ value }">
-            <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
-              {{ t('admin.users.roles.' + value) }}
+            <span :class="['badge', isStaffRole(value) ? 'badge-purple' : value === 'enterprise_user' ? 'badge-success' : 'badge-gray']">
+              {{ t(roleLabelKey(value)) }}
             </span>
           </template>
 
@@ -801,7 +801,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { useTableSelection } from '@/composables/useTableSelection'
 import { formatDateTime } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
-import { isStaffRole } from '@/utils/permissions'
+import { isStaffRole, roleLabelKey } from '@/utils/permissions'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
