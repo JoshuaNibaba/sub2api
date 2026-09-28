@@ -384,6 +384,45 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('[data-testid="codex-api-key-restart-notice"]').exists()).toBe(false)
   })
 
+  it('normalizes OpenAI Codex and Claude base URLs independently', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-test',
+        baseUrl: 'https://example.com',
+        platform: 'openai',
+        allowMessagesDispatch: true
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            template: '<div><slot /><slot name="footer" /></div>'
+          },
+          Icon: {
+            template: '<span />'
+          }
+        }
+      }
+    })
+
+    const codexConfig = wrapper.findAll('pre code')
+      .map((code) => code.text())
+      .find((content) => content.includes('model_provider = "OpenAI"'))
+    expect(codexConfig).toContain('base_url = "https://example.com/v1"')
+
+    const claudeTab = wrapper.findAll('button').find((button) =>
+      button.text().includes('keys.useKeyModal.cliTabs.claudeCode')
+    )
+    expect(claudeTab).toBeDefined()
+    await claudeTab!.trigger('click')
+    await nextTick()
+
+    const claudeConfig = wrapper.findAll('pre code')
+      .map((code) => code.text())
+      .find((content) => content.startsWith('export ANTHROPIC_BASE_URL'))
+    expect(claudeConfig).toContain('ANTHROPIC_BASE_URL="https://example.com"')
+  })
+
   it('renders API Key Mode authorization in OpenAI Codex config', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
@@ -809,9 +848,11 @@ describe('UseKeyModal', () => {
     const windowsConfig = wrapper.findAll('pre code')
       .map((code) => code.text())
       .find((content) => content.includes('[model_providers.sub2api]'))
-    expect(windowsConfig).toContain(
-      'model_catalog_json = "%userprofile%\\\\.codex\\\\codex-models.json"'
-    )
+    // Codex does not expand %userprofile% in config.toml; it only expands ~/.
+    expect(windowsConfig).toContain('model_catalog_json = "~/.codex/codex-models.json"')
+    expect(windowsConfig).not.toContain('%userprofile%')
+    expect(wrapper.get('[data-testid="codex-model-catalog"]').text())
+      .toContain('%userprofile%\\.codex\\codex-models.json')
   })
 
   it.each(['anthropic', 'gemini', 'antigravity', 'kimi', 'zhipu', 'minimax'] as const)(

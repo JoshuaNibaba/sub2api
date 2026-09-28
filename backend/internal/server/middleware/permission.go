@@ -19,10 +19,12 @@ type AccountOwnershipResolver interface {
 
 // RequireAccountRouteAccess gives super administrators the full account API,
 // while restricted administrators may create accounts and operate only on the
-// accounts they own, through any /admin/accounts/:id... endpoint. Operations
-// that address no single account (bulk updates, batch credential writes,
-// CRS sync, data import/export) and the credential-minting per-account
-// endpoints listed below remain super-admin-only.
+// accounts they own, through any /admin/accounts/:id... endpoint. The OAuth
+// bootstrap endpoints are also allowed because they create a new account for
+// the current operator; account ownership is assigned by the create handler.
+// Operations that address no single account (bulk updates, batch credential
+// writes, CRS sync, data import/export) and credential-minting operations for
+// an existing account remain super-admin-only.
 func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, ok := GetUserRoleFromContext(c)
@@ -86,6 +88,15 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 			c.Next()
 			return
 		}
+		// A restricted administrator may complete a new Claude OAuth or
+		// Setup Token flow. These endpoints do not target an existing account;
+		// the resulting account is created through POST /admin/accounts and is
+		// owned by the current operator. Existing-account credential replacement
+		// remains covered by the super-admin-only exceptions below.
+		if c.Request.Method == http.MethodPost && restrictedAdminOAuthBootstrapPath(path) {
+			c.Next()
+			return
+		}
 		// Owning an account means being able to run it, not just rename it: the
 		// row actions on the account page (test, clear error, recover state,
 		// reset quota, schedulability, model sync, probe toggles) all address
@@ -120,6 +131,22 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 		}
 		c.Next()
 	}
+}
+
+func restrictedAdminOAuthBootstrapPath(path string) bool {
+	for _, allowed := range []string{
+		"/admin/accounts/generate-auth-url",
+		"/admin/accounts/exchange-code",
+		"/admin/accounts/cookie-auth",
+		"/admin/accounts/generate-setup-token-url",
+		"/admin/accounts/exchange-setup-token-code",
+		"/admin/accounts/setup-token-cookie-auth",
+	} {
+		if strings.HasSuffix(path, allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 // RequireOwnedAccountParam guards account-scoped routes that live outside the

@@ -131,6 +131,18 @@ func TestRequireAccountRouteAccessAllowsOwnedAccountOperations(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/batch-delete", "/batch-delete"))
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/sync/crs", "/sync/crs"))
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/data", "/data"))
+	// A restricted administrator may bootstrap a new Claude OAuth account;
+	// the subsequent account creation assigns ownership to the operator.
+	for _, path := range []string{
+		"/generate-auth-url",
+		"/exchange-code",
+		"/cookie-auth",
+		"/generate-setup-token-url",
+		"/exchange-setup-token-code",
+		"/setup-token-cookie-auth",
+	} {
+		require.Equal(t, http.StatusOK, request(false, http.MethodPost, path, path), path)
+	}
 	// The read-only preview/batch POSTs the account page needs stay open.
 	require.Equal(t, http.StatusOK, request(false, http.MethodPost, "/usage/batch", "/usage/batch"))
 	require.Equal(t, http.StatusOK, request(false, http.MethodPost, "/today-stats/batch", "/today-stats/batch"))
