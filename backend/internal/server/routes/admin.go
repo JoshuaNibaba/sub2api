@@ -460,7 +460,7 @@ func registerAnnouncementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerOpenAIOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	openai := admin.Group("/openai")
-	openai.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
+	openai.Use(middleware.RequireOpenAIOAuthRouteAccess())
 	openai.Use(middleware.RequireOwnedAccountParam(h.Admin.Account))
 	{
 		openai.POST("/generate-auth-url", h.Admin.OpenAIOAuth.GenerateAuthURL)

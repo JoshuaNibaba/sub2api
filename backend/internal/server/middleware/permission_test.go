@@ -192,6 +192,32 @@ func TestRequireOwnedAccountParamGuardsProviderRoutes(t *testing.T) {
 	require.Equal(t, http.StatusOK, request(service.RoleAdmin, false, "/runtime-sanity"))
 }
 
+func TestRequireOpenAIOAuthRouteAccessPreservesExistingAccountPolicy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, role := range []string{service.RoleAdmin, service.RoleSuperAdmin, service.RoleUser, service.RoleEnterpriseUser} {
+		for _, owned := range []bool{false, true} {
+			for _, method := range []string{http.MethodGet, http.MethodPost} {
+				router := gin.New()
+				router.Use(func(c *gin.Context) {
+					c.Set(string(ContextKeyUserRole), role)
+					c.Set(string(ContextKeyUser), AuthSubject{UserID: 7})
+					c.Next()
+				})
+				group := router.Group("/api/v1/admin/openai")
+				group.Use(RequireOpenAIOAuthRouteAccess(), RequireOwnedAccountParam(accountOwnershipStub{owned: owned}))
+				group.Handle(method, "/accounts/:id/quota", func(c *gin.Context) { c.Status(http.StatusOK) })
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, httptest.NewRequest(method, "/api/v1/admin/openai/accounts/42/quota", nil))
+				want := http.StatusForbidden
+				if role == service.RoleSuperAdmin || (role == service.RoleAdmin && owned && method == http.MethodGet) {
+					want = http.StatusOK
+				}
+				require.Equal(t, want, w.Code, "role=%s owned=%v method=%s", role, owned, method)
+			}
+		}
+	}
+}
+
 func TestRequireOwnedAccountViaResolvesParentAccount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	request := func(owned bool, resolve RouteAccountResolver) int {

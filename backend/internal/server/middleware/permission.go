@@ -149,6 +149,28 @@ func restrictedAdminOAuthBootstrapPath(path string) bool {
 	return false
 }
 
+// RequireOpenAIOAuthRouteAccess allows new-account authorization without
+// granting access to stored credentials or existing-account mutations.
+func RequireOpenAIOAuthRouteAccess() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodPost {
+			for _, path := range []string{
+				"/admin/openai/generate-auth-url",
+				"/admin/openai/exchange-code",
+				"/admin/openai/refresh-token",
+				"/admin/openai/create-from-oauth",
+				"/admin/openai/create-from-codex-pat",
+			} {
+				if strings.HasSuffix(c.FullPath(), path) {
+					RequireAnyPermission(service.PermissionAdminCredentialsRead, service.PermissionAdminAccountsOwnedWrite)(c)
+					return
+				}
+			}
+		}
+		RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead)(c)
+	}
+}
+
 // RequireOwnedAccountParam guards account-scoped routes that live outside the
 // /admin/accounts group — the provider-specific quota, balance and plan
 // endpoints. Those groups are reachable with admin.accounts.read alone, so
