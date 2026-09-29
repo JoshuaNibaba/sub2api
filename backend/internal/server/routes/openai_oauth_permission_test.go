@@ -35,9 +35,10 @@ func TestOpenAIOAuthBootstrapRoutesPermissions(t *testing.T) {
 				w := httptest.NewRecorder()
 				router.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/admin/openai"+path, nil))
 				want := http.StatusForbidden
-				if role == "" {
+				switch role {
+				case "":
 					want = http.StatusUnauthorized
-				} else if role == service.RoleAdmin || role == service.RoleSuperAdmin {
+				case service.RoleAdmin, service.RoleSuperAdmin:
 					// An empty request must reach validation instead of permission denial.
 					want = http.StatusBadRequest
 					if path == "/generate-auth-url" {
