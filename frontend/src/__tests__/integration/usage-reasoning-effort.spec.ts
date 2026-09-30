@@ -128,6 +128,12 @@ vi.mock('@/stores/app', () => ({
   }),
 }))
 
+// The user usage page reads permissions from the auth store; an ordinary user
+// holds none of them.
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ hasPermission: () => false }),
+}))
+
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {

@@ -21,6 +21,12 @@ vi.mock('@/stores/app', () => ({
   useAppStore: () => ({ showSuccess, showError })
 }))
 
+// Role options depend on admin.users.role_manage; these tests cover
+// concurrency only, so the operator is a restricted admin without it.
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ hasPermission: () => false })
+}))
+
 vi.mock('@/composables/useClipboard', () => ({
   useClipboard: () => ({ copyToClipboard: vi.fn() })
 }))

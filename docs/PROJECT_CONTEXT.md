@@ -8,8 +8,14 @@
 - 本地项目：`/Users/joshua/Source/sub2`
 - 个人仓库：`https://github.com/JoshuaNibaba/sub2api.git`
 - 官方上游：`https://github.com/Wei-Shaw/sub2api.git`
-- 当前基线：`main` 与两个远程的 `main` 均指向提交
-  `bbdcfbac0a3c0982a33639fba372d55d25724e2f`
+- 分支关系：个人 `main` = 官方 `upstream/main` + 本 Fork 的定制提交（角色权限、账号归属、
+  企业视图、模型/版本同步、部署记录等）。具体提交不在文档中固定，用以下命令查看：
+
+  ```bash
+  git fetch upstream
+  git rev-list --left-right --count upstream/main...main   # 左：落后上游；右：领先上游
+  git log --oneline --no-merges upstream/main..main        # 本 Fork 的定制提交
+  ```
 - Git 远程约定：
   - `origin`：个人 Fork，功能分支和个人版本推送到这里。
   - `upstream`：官方仓库，只用于同步和对比，不直接作为个人发布目标。
@@ -192,7 +198,7 @@ pnpm run test:run
 pnpm run build
 ```
 
-根目录 `make test` 还会运行前端关键 Vitest 集合；CI 额外运行部署脚本检查和安全扫描。当前仓库期望 Go 1.27、Node.js 18+、pnpm 9、PostgreSQL 15+、Redis 7+，实际执行前以 `backend/go.mod`、锁文件和 CI 配置为准。
+根目录 `make test` 还会运行前端关键 Vitest 集合；CI 额外运行部署脚本检查和安全扫描。当前仓库期望 Go 1.27.0（本机系统 Go 较旧时由 `GOTOOLCHAIN=auto` 自动切换）、Node.js 20（与 CI 一致）、pnpm 9、PostgreSQL 15+、Redis 7+，实际执行前以 `backend/go.mod`、锁文件和 CI 配置为准。
 
 开发时建议先运行与改动直接相关的最小测试，再运行对应层级的完整测试。集成测试通常需要 PostgreSQL/Redis；没有依赖服务时不要把环境缺失误判成代码回归。
 
@@ -241,9 +247,33 @@ git push -u origin feat/<short-name>
 
 在同步上游前先确认工作区干净，并检查是否存在个人分支未合并的改动。不要用 `git reset --hard` 或强制推送覆盖用户代码，除非用户明确要求。
 
-## 11. 当前开发注意事项
+本 Fork 已有定制提交，`main` 与上游通常无法 fast-forward，同步时使用 `git merge upstream/main`
+（在独立分支上合并并通过测试后再合入 `main`）。
 
-- `DEV_GUIDE.md` 包含历史环境和其他 Fork 的信息；本项目以本文件开头记录的 `JoshuaNibaba/sub2api` 和当前机器环境为准，不复制其中的凭据或过时账号信息。
+### 迁移文件编号
+
+迁移执行器按**完整文件名**排序并记录（`schema_migrations.filename`），编号前缀允许重复。
+本 Fork 的 `239_expand_user_roles.sql`、`240_add_account_owner.sql` 与上游同编号文件并存属于已知情况，
+**不要重命名已发布的迁移**（改名会被视为新迁移再次执行）。新增 Fork 专属迁移时，使用上游不会占用的
+文件名（例如在当前最大编号后追加 `_fork_` 字样的后缀），并在合并上游前检查排序结果。
+
+## 11. 生产部署
+
+非敏感的部署参数记录在 `deploy/cloud-deployment.yaml`（服务器、域名、当前镜像）。流程：
+
+1. 合入并推送 `main` 后，`.github/workflows/container-main.yml` 构建多架构镜像并推送
+   `ghcr.io/joshuanibaba/sub2api:sha-<完整提交>` 与 `:latest`。
+2. 服务器 `/opt/sub2api` 使用 `docker-compose.yml` + `docker-compose.override.yml`，
+   override 中固定 `sub2api` 服务的镜像 tag。部署时先备份 override，再改为新的 `sha-` tag，执行
+   `docker compose pull sub2api && docker compose up -d sub2api`，确认容器 `healthy` 且 `/health` 正常。
+3. 部署成功后更新 `deploy/cloud-deployment.yaml` 的 `image` 并以 `[skip ci]` 提交，避免重复构建。
+4. 回滚：恢复备份的 override 并重新 `docker compose up -d sub2api`。包含迁移的版本需先评估迁移是否可逆。
+
+`.env`、密钥与数据库凭据只保存在服务器上，不进入仓库。
+
+## 12. 当前开发注意事项
+
+- `DEV_GUIDE.md` 继承自上游社区的通用开发笔记，其中 Windows 相关条目仅供参考；本项目以本文件记录的 `JoshuaNibaba/sub2api` 和当前 macOS 环境为准。
 - API Key、OAuth token、数据库密码、JWT/TOTP secret、代理认证信息和完整上游 URL 不写入提交、日志或文档。
 - 网关错误不能只看最终 HTTP 状态；需要同时看请求入口、上游尝试、账号切换、代理归因、计费和审计事件。
 - 生成代码、锁文件、迁移文件和嵌入式前端产物都可能是构建输入；变更后检查 Git diff 是否包含应提交的生成结果。

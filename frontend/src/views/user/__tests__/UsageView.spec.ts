@@ -104,6 +104,12 @@ vi.mock('@/stores/app', () => ({
   }),
 }))
 
+// UsageView reads permissions from the auth store (enterprise routing column);
+// an ordinary user holds none of them.
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ hasPermission: () => false }),
+}))
+
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {

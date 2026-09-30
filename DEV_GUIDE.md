@@ -1,5 +1,10 @@
 # sub2api 项目开发指南
 
+> **本 Fork（JoshuaNibaba/sub2api）说明**：本文件与上游保持一致以减少合并冲突，其中的 Fork 仓库名
+> （bayma888/sub2api-bmai）、Windows 路径、本地示例数据库口令和 `.claude/CLAUDE.md` 等内容来自上游，
+> 不适用于本项目。本项目的仓库、环境、验证命令和生产部署流程以
+> [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) 为准。
+
 > 本文档记录项目环境配置、常见坑点和注意事项，供 Claude Code 和团队成员参考。
 
 ## 一、项目基本信息
