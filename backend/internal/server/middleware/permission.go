@@ -112,10 +112,15 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 		// either writes fresh credential material or spawns a second account
 		// from the source's credentials, and account creation from credentials
 		// is gated on admin.credentials.read, which this role does not hold.
+		// Claude reset-credit redemption joins them: it spends an irreversible
+		// upstream credit, and its Codex counterpart (POST
+		// /admin/openai/accounts/:id/reset-quota) already requires
+		// admin.credentials.read.
 		for _, superAdminOnly := range []string{
 			"/admin/accounts/:id/duplicate",
 			"/admin/accounts/:id/apply-oauth-credentials",
 			"/admin/accounts/:id/shadow",
+			"/admin/accounts/:id/claude/reset-credits/redeem",
 		} {
 			if strings.HasSuffix(path, superAdminOnly) {
 				AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Operation requires a super administrator")

@@ -126,6 +126,9 @@ func TestRequireAccountRouteAccessAllowsOwnedAccountOperations(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/:id/duplicate", "/42/duplicate"))
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/:id/apply-oauth-credentials", "/42/apply-oauth-credentials"))
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/:id/shadow", "/42/shadow"))
+	// Redeeming a Claude reset credit spends it irreversibly, matching the
+	// credentials-gated Codex reset-quota route.
+	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/:id/claude/reset-credits/redeem", "/42/claude/reset-credits/redeem"))
 	// So do the endpoints that address no single account.
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/bulk-update", "/bulk-update"))
 	require.Equal(t, http.StatusForbidden, request(true, http.MethodPost, "/batch-delete", "/batch-delete"))

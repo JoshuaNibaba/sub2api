@@ -53,5 +53,28 @@ func TestClaudeResetRedeemRouteMatchesCodexResetProtection(t *testing.T) {
 	codexChain := chains["/api/v1/admin/openai/accounts/:id/reset-quota"]
 	claudeChain := chains["/api/v1/admin/accounts/:id/claude/reset-credits/redeem"]
 	require.NotEmpty(t, codexChain)
-	require.Equal(t, strings.Join(codexChain, "\n"), strings.Join(claudeChain, "\n"))
+	// The fork guards each admin group with its own permission middleware
+	// (/accounts vs /openai), so only the admin-wide chain must be identical.
+	// Restricted-admin denial for the redeem route is covered in
+	// middleware.TestRequireAccountRouteAccessAllowsOwnedAccountOperations.
+	groupGuards := []string{
+		"middleware.RequireAccountRouteAccess.",
+		"middleware.RequireOpenAIOAuthRouteAccess.",
+		"middleware.RequireOwnedAccountParam.",
+	}
+	adminWide := func(chain []string) []string {
+		var out []string
+		for _, name := range chain {
+			guarded := false
+			for _, guard := range groupGuards {
+				guarded = guarded || strings.Contains(name, guard)
+			}
+			if !guarded {
+				out = append(out, name)
+			}
+		}
+		return out
+	}
+	require.Equal(t, strings.Join(adminWide(codexChain), "\n"), strings.Join(adminWide(claudeChain), "\n"))
+	require.True(t, strings.Contains(strings.Join(claudeChain, "\n"), "middleware.RequireAccountRouteAccess."), "redeem route must sit behind RequireAccountRouteAccess")
 }
