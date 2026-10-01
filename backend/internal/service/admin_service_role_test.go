@@ -141,3 +141,44 @@ func TestAdminService_UpdateUser_PromoteDoesNotCountAdmins(t *testing.T) {
 	require.Equal(t, RoleAdmin, updated.Role)
 	require.Equal(t, 0, repo.listCalls, "升级路径不应触发管理员计数")
 }
+
+func TestAdminService_UpdateUser_DisableRestrictedAdminAllowed(t *testing.T) {
+	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleAdmin, Status: StatusActive}}
+	repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 1}
+	svc := &adminServiceImpl{
+		userRepo:             repo,
+		redeemCodeRepo:       &redeemRepoStub{},
+		authCacheInvalidator: &authCacheInvalidatorStub{},
+	}
+
+	updated, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Status: StatusDisabled})
+	require.NoError(t, err)
+	require.Equal(t, StatusDisabled, updated.Status)
+	require.Equal(t, 0, repo.listCalls, "禁用受限管理员不应触发超级管理员计数")
+}
+
+func TestAdminService_UpdateUser_DisableLastActiveSuperAdminRejected(t *testing.T) {
+	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleSuperAdmin, Status: StatusActive}}
+	repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 1}
+	svc := &adminServiceImpl{userRepo: repo, redeemCodeRepo: &redeemRepoStub{}}
+
+	_, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Status: StatusDisabled})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "last active super admin")
+	require.Nil(t, repo.lastUpdated, "最后一个启用中的超级管理员不应被禁用")
+}
+
+func TestAdminService_UpdateUser_DisableSuperAdminAllowedWhenOthersActive(t *testing.T) {
+	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleSuperAdmin, Status: StatusActive}}
+	repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 2}
+	svc := &adminServiceImpl{
+		userRepo:             repo,
+		redeemCodeRepo:       &redeemRepoStub{},
+		authCacheInvalidator: &authCacheInvalidatorStub{},
+	}
+
+	updated, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Status: StatusDisabled})
+	require.NoError(t, err)
+	require.Equal(t, StatusDisabled, updated.Status)
+	require.Equal(t, 1, repo.listCalls)
+}

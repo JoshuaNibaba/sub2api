@@ -53,6 +53,12 @@ vi.mock('@/stores/app', () => ({
   })
 }))
 
+const authState = vi.hoisted(() => ({ isSuperAdmin: true, user: { id: 1 } as { id: number } | null }))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => authState
+}))
+
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
@@ -180,6 +186,7 @@ const getToggleStatusButton = (wrapper: ReturnType<typeof mountBulkDeleteView>, 
 describe('admin UsersView', () => {
   beforeEach(() => {
     vi.useRealTimers()
+    authState.isSuperAdmin = true
     localStorage.clear()
 
     listUsers.mockReset()
@@ -306,6 +313,33 @@ describe('admin UsersView', () => {
     expect(wrapper.get('[data-test="row-state"]').text()).toBe('42:disabled:3,43:active:0')
     expect(getToggleStatusButton(wrapper, 42).text()).toBe('admin.users.enable')
     expect(showSuccess).toHaveBeenCalledWith('admin.users.userDisabled')
+    wrapper.unmount()
+  })
+
+  it.each([
+    { actor: 'super admin', isSuperAdmin: true, visible: { 1: false, 2: true, 3: true, 42: true } },
+    { actor: 'restricted admin', isSuperAdmin: false, visible: { 1: false, 2: false, 3: false, 42: true } }
+  ])('shows the disable button for staff accounts only to a super admin ($actor)', async ({ isSuperAdmin, visible }) => {
+    authState.isSuperAdmin = isSuperAdmin
+    listUsers.mockResolvedValue({
+      items: [
+        createAdminUser({ id: 1, role: 'super_admin' }),
+        createAdminUser({ id: 2, role: 'admin' }),
+        createAdminUser({ id: 3, role: 'super_admin' }),
+        createAdminUser({ id: 42 })
+      ],
+      total: 4, page: 1, page_size: 20, pages: 1
+    })
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+
+    for (const [id, shown] of Object.entries(visible)) {
+      const hasButton = wrapper
+        .get(`[data-test="actions-${id}"]`)
+        .findAll('button')
+        .some((candidate) => /admin\.users\.(disable|enable)$/.test(candidate.text()))
+      expect(hasButton, `user ${id}`).toBe(shown)
+    }
     wrapper.unmount()
   })
 

@@ -347,6 +347,27 @@ func (h *UserHandler) Update(c *gin.Context) {
 		}
 	}
 
+	// 禁用账号：任何人不能禁用自己；禁用管理员账号仅限超级管理员。
+	if req.Status == service.StatusDisabled {
+		if userID == getAdminIDFromContext(c) {
+			response.BadRequest(c, "cannot disable yourself")
+			return
+		}
+		if target == nil {
+			target, err = h.adminService.GetUser(c.Request.Context(), userID)
+			if err != nil {
+				response.ErrorFrom(c, err)
+				return
+			}
+		}
+		if target.IsAdmin() {
+			if role, ok := middleware.GetUserRoleFromContext(c); ok && !service.HasPermission(role, service.PermissionAdminUsersRoleManage) {
+				response.Forbidden(c, "Only a super administrator can disable administrator accounts")
+				return
+			}
+		}
+	}
+
 	// 把用户提升为管理员属权限敏感操作：需最近完成 step-up 2FA 验证。
 	if req.Role == service.RoleSuperAdmin || req.Role == service.RoleAdmin {
 		if target == nil {

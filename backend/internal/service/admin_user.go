@@ -179,6 +179,21 @@ func (s *adminServiceImpl) ensureNotLastSuperAdmin(ctx context.Context) error {
 	return nil
 }
 
+func (s *adminServiceImpl) ensureNotLastActiveSuperAdmin(ctx context.Context) error {
+	noSubs := false
+	_, result, err := s.userRepo.ListWithFilters(ctx,
+		pagination.PaginationParams{Page: 1, PageSize: 1},
+		UserListFilters{Role: RoleSuperAdmin, Status: StatusActive, IncludeSubscriptions: &noSubs},
+	)
+	if err != nil {
+		return fmt.Errorf("count active super admin users: %w", err)
+	}
+	if result == nil || result.Total <= 1 {
+		return errors.New("cannot disable the last active super admin user")
+	}
+	return nil
+}
+
 func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userID int64) {
 	if s.settingService == nil || s.defaultSubAssigner == nil || userID <= 0 {
 		return
@@ -211,9 +226,12 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		return nil, err
 	}
 
-	// Protect admin users: cannot disable admin accounts
-	if user.IsAdmin() && input.Status == "disabled" {
-		return nil, errors.New("cannot disable admin user")
+	// 防锁死保护：不允许禁用系统中最后一个启用中的超级管理员。
+	// 谁有权禁用管理员账号（仅超级管理员、且不能禁用自己）由 handler 校验。
+	if user.IsSuperAdmin() && input.Status == StatusDisabled && user.Status != StatusDisabled {
+		if err := s.ensureNotLastActiveSuperAdmin(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	oldConcurrency := user.Concurrency

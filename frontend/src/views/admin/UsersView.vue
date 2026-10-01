@@ -623,9 +623,9 @@
                 <span class="text-xs">{{ t('common.edit') }}</span>
               </button>
 
-              <!-- Toggle Status Button (not for admin) -->
+              <!-- Toggle Status Button (staff accounts: super admin only, never self) -->
               <button
-                v-if="!isStaffRole(row.role)"
+                v-if="canToggleStatus(row)"
                 @click="handleToggleStatus(row)"
                 :class="[
                   'flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors',
@@ -802,6 +802,7 @@ import { useTableSelection } from '@/composables/useTableSelection'
 import { formatDateTime } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
 import { isStaffRole, roleLabelKey } from '@/utils/permissions'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
@@ -835,6 +836,11 @@ import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryM
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
+
+// 与后端一致：不能禁用自己；禁用管理员账号仅限超级管理员。
+const canToggleStatus = (user: AdminUser) =>
+  user.id !== authStore.user?.id && (!isStaffRole(user.role) || authStore.isSuperAdmin)
 
 // Generate dynamic attribute columns from enabled definitions
 const attributeColumns = computed<Column[]>(() =>
