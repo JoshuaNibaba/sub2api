@@ -77,6 +77,8 @@ export default {
         'Existing accounts only sync fields returned by CRS; missing fields keep their current values. Credentials are merged by key — keys not returned by CRS are preserved. Proxies are kept when "Sync proxies" is unchecked.',
       crsBack: 'Back',
       editAccount: 'Edit Account',
+      viewAccount: 'View Account',
+      readonlyNotice: 'This account belongs to someone else and is view-only. Its proxy address is masked.',
       deleteAccount: 'Delete Account',
       searchAccounts: 'Search accounts...',
       notes: 'Notes',

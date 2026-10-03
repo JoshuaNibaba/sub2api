@@ -38,7 +38,7 @@
             />
           </div>
           <button
-            v-if="proxies.length > 0"
+            v-if="allowTest && proxies.length > 0"
             type="button"
             @click.stop="handleBatchTest"
             :disabled="batchTesting"
@@ -120,6 +120,7 @@
 
             <!-- Individual test button -->
             <button
+              v-if="allowTest"
               type="button"
               @click.stop="handleTestProxy(proxy)"
               :disabled="testingProxyIds.has(proxy.id)"
@@ -190,10 +191,14 @@ interface Props {
   modelValue: number | null
   proxies: Proxy[]
   disabled?: boolean
+  // Testing is a proxy-management action; callers hide it from viewers who
+  // lack proxy write access instead of letting them hit 403s.
+  allowTest?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  disabled: false
+  disabled: false,
+  allowTest: true
 })
 
 const emit = defineEmits<{

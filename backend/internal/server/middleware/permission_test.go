@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -149,6 +150,35 @@ func TestRequireAccountRouteAccessAllowsOwnedAccountOperations(t *testing.T) {
 	// The read-only preview/batch POSTs the account page needs stay open.
 	require.Equal(t, http.StatusOK, request(false, http.MethodPost, "/usage/batch", "/usage/batch"))
 	require.Equal(t, http.StatusOK, request(false, http.MethodPost, "/today-stats/batch", "/today-stats/batch"))
+}
+
+// Restricted administrators read the whole pool: the detail view and usage
+// statistics of accounts they do not own stay open, while upstream-querying
+// reads and every mutation remain owner-only.
+func TestRequireAccountRouteAccessAllowsSharedAccountReads(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	request := func(method, route, target string) int {
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			c.Set(string(ContextKeyUserRole), service.RoleAdmin)
+			c.Set(string(ContextKeyUser), AuthSubject{UserID: 7})
+			c.Next()
+		})
+		group := r.Group("/api/v1/admin/accounts")
+		group.Use(RequireAccountRouteAccess(accountOwnershipStub{owned: false}))
+		group.Handle(method, route, func(c *gin.Context) { c.Status(http.StatusOK) })
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(method, "/api/v1/admin/accounts"+target, nil))
+		return w.Code
+	}
+	for _, route := range []string{"/:id", "/:id/stats", "/:id/usage", "/:id/today-stats", "/:id/models", "/:id/temp-unschedulable"} {
+		target := strings.Replace(route, ":id", "42", 1)
+		require.Equal(t, http.StatusOK, request(http.MethodGet, route, target), route)
+	}
+	require.Equal(t, http.StatusForbidden, request(http.MethodGet, "/:id/claude/reset-credits", "/42/claude/reset-credits"))
+	require.Equal(t, http.StatusForbidden, request(http.MethodGet, "/:id/ollama-cloud-usage", "/42/ollama-cloud-usage"))
+	require.Equal(t, http.StatusForbidden, request(http.MethodPut, "/:id", "/42"))
+	require.Equal(t, http.StatusForbidden, request(http.MethodDelete, "/:id/temp-unschedulable", "/42/temp-unschedulable"))
 }
 
 func TestRequireAccountRouteAccessDeniesExportToRestrictedAdmin(t *testing.T) {

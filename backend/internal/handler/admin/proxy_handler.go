@@ -8,10 +8,35 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
+
+// proxyViewerMasked reports whether the caller may read proxies but not manage
+// them. Such viewers (restricted administrators) get endpoint identifiers
+// masked and no password, so they can tell proxies apart without copying one.
+func proxyViewerMasked(c *gin.Context) bool {
+	role, _ := servermiddleware.GetUserRoleFromContext(c)
+	return !service.HasPermission(role, service.PermissionAdminProxiesWrite)
+}
+
+func proxyWithAccountCountResponse(c *gin.Context, p *service.ProxyWithAccountCount) *dto.AdminProxyWithAccountCount {
+	out := dto.ProxyWithAccountCountFromServiceAdmin(p)
+	if proxyViewerMasked(c) {
+		return dto.MaskedAdminProxyWithAccountCount(out)
+	}
+	return out
+}
+
+func proxyResponse(c *gin.Context, p *service.Proxy) *dto.AdminProxy {
+	out := dto.ProxyFromServiceAdmin(p)
+	if proxyViewerMasked(c) {
+		return dto.MaskedAdminProxy(out)
+	}
+	return out
+}
 
 // ProxyHandler handles admin proxy management
 type ProxyHandler struct {
@@ -77,7 +102,7 @@ func (h *ProxyHandler) List(c *gin.Context) {
 
 	out := make([]dto.AdminProxyWithAccountCount, 0, len(proxies))
 	for i := range proxies {
-		out = append(out, *dto.ProxyWithAccountCountFromServiceAdmin(&proxies[i]))
+		out = append(out, *proxyWithAccountCountResponse(c, &proxies[i]))
 	}
 	response.Paginated(c, out, total, page, pageSize)
 }
@@ -96,7 +121,7 @@ func (h *ProxyHandler) GetAll(c *gin.Context) {
 		}
 		out := make([]dto.AdminProxyWithAccountCount, 0, len(proxies))
 		for i := range proxies {
-			out = append(out, *dto.ProxyWithAccountCountFromServiceAdmin(&proxies[i]))
+			out = append(out, *proxyWithAccountCountResponse(c, &proxies[i]))
 		}
 		response.Success(c, out)
 		return
@@ -110,7 +135,7 @@ func (h *ProxyHandler) GetAll(c *gin.Context) {
 
 	out := make([]dto.AdminProxy, 0, len(proxies))
 	for i := range proxies {
-		out = append(out, *dto.ProxyFromServiceAdmin(&proxies[i]))
+		out = append(out, *proxyResponse(c, &proxies[i]))
 	}
 	response.Success(c, out)
 }
@@ -130,7 +155,7 @@ func (h *ProxyHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.ProxyFromServiceAdmin(proxy))
+	response.Success(c, proxyResponse(c, proxy))
 }
 
 // Create handles creating a new proxy

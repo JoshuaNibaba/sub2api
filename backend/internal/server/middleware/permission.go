@@ -47,6 +47,10 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 					AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account export requires a super administrator")
 					return
 				}
+				if restrictedAdminSharedAccountRead(path) {
+					c.Next()
+					return
+				}
 				if strings.Contains(path, "/admin/accounts/:id") {
 					if !accountRouteOwnerAllowed(c, resolver) {
 						return
@@ -240,6 +244,28 @@ func RequireOwnedAccountVia(resolve RouteAccountResolver, resolver AccountOwners
 		}
 		c.Next()
 	}
+}
+
+// restrictedAdminSharedAccountReadSuffixes are the per-account reads a
+// restricted administrator may perform on any account in the pool: the detail
+// view (served with its proxy masked) and the usage statistics. Reads that
+// query the upstream provider with the account's own session stay owner-only.
+var restrictedAdminSharedAccountReadSuffixes = []string{
+	"/admin/accounts/:id",
+	"/admin/accounts/:id/stats",
+	"/admin/accounts/:id/usage",
+	"/admin/accounts/:id/today-stats",
+	"/admin/accounts/:id/models",
+	"/admin/accounts/:id/temp-unschedulable",
+}
+
+func restrictedAdminSharedAccountRead(path string) bool {
+	for _, suffix := range restrictedAdminSharedAccountReadSuffixes {
+		if strings.HasSuffix(path, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func accountRouteOwnerAllowed(c *gin.Context, resolver AccountOwnershipResolver) bool {

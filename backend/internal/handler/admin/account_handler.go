@@ -874,24 +874,13 @@ func (h *AccountHandler) List(c *gin.Context) {
 
 	h.enrichShadowParents(c.Request.Context(), result)
 	if restrictedViewer {
+		// Restricted administrators read the whole pool, but the proxy of an
+		// account they do not own is masked so it cannot be copied out.
 		for i := range result {
-			if result[i].Account != nil && result[i].OwnerUserID != nil && *result[i].OwnerUserID == viewerUserID {
+			if result[i].Account == nil || accounts[i].IsOwnedBy(viewerUserID) {
 				continue
 			}
-			masked := dto.AccountFromServiceMasked(&accounts[i])
-			if h.isSimpleMode() {
-				masked.GroupIDs = filterSimpleModeGroupIDs(masked.GroupIDs, simpleModeCompositeServiceGroupIDs(&accounts[i]))
-			}
-			result[i].Account = masked
-			// The wrapper fields live outside dto.Account, so replacing the
-			// embedded account is not enough: scheduler internals, window cost,
-			// session counts and RPM would still describe how much traffic
-			// somebody else's account is carrying. Capacity usage stays.
-			result[i].SchedulerScore = nil
-			result[i].SchedulerScores = nil
-			result[i].CurrentWindowCost = nil
-			result[i].ActiveSessions = nil
-			result[i].CurrentRPM = nil
+			result[i].Proxy = dto.MaskedProxy(result[i].Proxy)
 		}
 	}
 
@@ -1122,14 +1111,11 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 		}
 	}
 
-	role, viewerUserID := accountViewer(c)
-	if service.IsStaffRole(role) && !service.IsSuperAdminRole(role) && !account.IsOwnedBy(viewerUserID) {
-		item := h.buildAccountResponseWithRuntime(c.Request.Context(), account)
-		item.Account = dto.AccountFromServiceMasked(account)
-		response.Success(c, item)
-		return
+	item := h.buildAccountResponseWithRuntime(c.Request.Context(), account)
+	if restricted, viewerUserID := restrictedAccountViewer(c); restricted && !account.IsOwnedBy(viewerUserID) && item.Account != nil {
+		item.Proxy = dto.MaskedProxy(item.Proxy)
 	}
-	response.Success(c, h.buildAccountResponseWithRuntime(c.Request.Context(), account))
+	response.Success(c, item)
 }
 
 // CheckMixedChannel handles checking mixed channel risk for account-group binding.
@@ -2878,29 +2864,6 @@ type BatchUsageRequest struct {
 	Force      bool    `json:"force"`
 }
 
-// restrictBatchAccountIDs prevents the read-only batch endpoints from being
-// used as an ownership oracle by restricted administrators. The route
-// middleware intentionally permits these endpoints so the canonical account
-// table can render owned runtime data, therefore the handler must scope the
-// requested IDs before querying usage services.
-func (h *AccountHandler) restrictBatchAccountIDs(c *gin.Context, accountIDs []int64) ([]int64, error) {
-	restricted, viewerUserID := restrictedAccountViewer(c)
-	if !restricted || len(accountIDs) == 0 {
-		return accountIDs, nil
-	}
-	accounts, err := h.adminService.GetAccountsByIDs(c.Request.Context(), accountIDs)
-	if err != nil {
-		return nil, err
-	}
-	owned := make([]int64, 0, len(accounts))
-	for _, account := range accounts {
-		if account != nil && account.IsOwnedBy(viewerUserID) {
-			owned = append(owned, account.ID)
-		}
-	}
-	return owned, nil
-}
-
 // GetBatchTodayStats 批量获取多个账号的今日统计。
 // POST /api/v1/admin/accounts/today-stats/batch
 func (h *AccountHandler) GetBatchTodayStats(c *gin.Context) {
@@ -2911,11 +2874,6 @@ func (h *AccountHandler) GetBatchTodayStats(c *gin.Context) {
 	}
 
 	accountIDs := normalizeInt64IDList(req.AccountIDs)
-	accountIDs, scopeErr := h.restrictBatchAccountIDs(c, accountIDs)
-	if scopeErr != nil {
-		response.ErrorFrom(c, scopeErr)
-		return
-	}
 	if len(accountIDs) == 0 {
 		response.Success(c, gin.H{"stats": map[string]any{}})
 		return
@@ -2962,11 +2920,6 @@ func (h *AccountHandler) GetBatchUsage(c *gin.Context) {
 	}
 
 	accountIDs := normalizeInt64IDList(req.AccountIDs)
-	accountIDs, scopeErr := h.restrictBatchAccountIDs(c, accountIDs)
-	if scopeErr != nil {
-		response.ErrorFrom(c, scopeErr)
-		return
-	}
 	if len(accountIDs) == 0 {
 		response.Success(c, gin.H{
 			"usage":  map[string]any{},

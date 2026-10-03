@@ -444,7 +444,17 @@
             </div>
           </template>
           <template #cell-actions="{ row }">
-            <span v-if="enterpriseReadOnly || !canMutateAccount(row)" class="text-sm text-gray-400">-</span>
+            <span v-if="enterpriseReadOnly" class="text-sm text-gray-400">-</span>
+            <div v-else-if="!canMutateAccount(row)" class="flex items-center gap-1" data-test="account-readonly-actions">
+              <button @click="handleView(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
+                <Icon name="eye" size="sm" />
+                <span class="text-xs">{{ t('common.view') }}</span>
+              </button>
+              <button @click="handleViewStats(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-indigo-600 dark:hover:bg-dark-700 dark:hover:text-indigo-400">
+                <Icon name="chart" size="sm" />
+                <span class="text-xs">{{ t('admin.accounts.viewStats') }}</span>
+              </button>
+            </div>
             <template v-else>
             <div class="flex items-center gap-1">
               <button @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
@@ -468,8 +478,8 @@
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
     <template v-if="!enterpriseReadOnly">
-    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
-    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
+    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" :allow-proxy-test="canManageProxies" @close="showCreate = false" @created="reload" />
+    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" :readonly="edReadOnly" :allow-proxy-test="canManageProxies" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
@@ -567,6 +577,7 @@ const enterpriseReadOnly = computed(
   () => !authStore.isAdmin && authStore.hasPermission(Permission.EnterpriseAccountPool)
 )
 const restrictedAdmin = computed(() => authStore.isAdmin && !authStore.isSuperAdmin)
+const canManageProxies = computed(() => authStore.hasPermission(Permission.AdminProxiesWrite))
 const ownsAccount = (row: Pick<AccountListItem, 'owner_user_id'>) =>
   row.owner_user_id != null && row.owner_user_id === authStore.user?.id
 const canMutateAccount = (row: Pick<AccountListItem, 'owner_user_id'>) => {
@@ -574,22 +585,18 @@ const canMutateAccount = (row: Pick<AccountListItem, 'owner_user_id'>) => {
   if (!restrictedAdmin.value) return true
   return ownsAccount(row)
 }
-// A redacted row arrives without an owner: the backend dropped its full name,
-// proxy, credentials and billing multiplier, so those cells must render as
-// unavailable instead of showing a default that looks like real data.
-const isRedactedAccount = (row: Pick<AccountListItem, 'owner_user_id'>) => {
-  if (enterpriseReadOnly.value) return true
-  return restrictedAdmin.value && !ownsAccount(row)
-}
-const canQueryAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'>) => {
-  if (enterpriseReadOnly.value) return false
-  if (!restrictedAdmin.value) return true
-  return ownsAccount(row)
-}
+// Enterprise rows arrive redacted: the backend dropped their full name, proxy,
+// credentials and billing multiplier, so those cells must render as
+// unavailable instead of showing a default that looks like real data. Staff
+// see every account in full; only the proxy of an account a restricted
+// administrator does not own arrives masked.
+const isRedactedAccount = (_row: Pick<AccountListItem, 'owner_user_id'>) => enterpriseReadOnly.value
+// Usage and statistics are read-only, so every staff member may load them.
+const canQueryAccountOperationalData = (_row: Pick<AccountListItem, 'owner_user_id'>) => !enterpriseReadOnly.value
 // Probes hit the upstream provider with the account's own credentials, so they
 // follow the same rule as any other per-account action: owners only.
 const canProbeAccountOperationalData = (row: Pick<AccountListItem, 'owner_user_id'>) =>
-  canQueryAccountOperationalData(row)
+  canMutateAccount(row)
 
 const proxies = ref<AccountProxy[]>([])
 const groups = ref<AdminGroup[]>([])
@@ -650,6 +657,7 @@ const selTypes = computed<AccountType[]>(() => {
 })
 const showCreate = ref(false)
 const showEdit = ref(false)
+const edReadOnly = ref(false)
 const showSync = ref(false)
 const showImportData = ref(false)
 const showExportDataDialog = ref(false)
@@ -1947,6 +1955,16 @@ const handleEdit = async (a: AccountListItem) => {
   const account = await loadAccountDetails(a)
   if (!account) return
   edAcc.value = account
+  edReadOnly.value = false
+  showEdit.value = true
+}
+// Restricted administrators may inspect any account in the pool; accounts they
+// do not own open in the same modal with every control disabled.
+const handleView = async (a: AccountListItem) => {
+  const account = await loadAccountDetails(a)
+  if (!account) return
+  edAcc.value = account
+  edReadOnly.value = true
   showEdit.value = true
 }
 const openMenu = (a: Account, e: MouseEvent) => {

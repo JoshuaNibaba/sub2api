@@ -349,6 +349,34 @@ describe('EditAccountModal', () => {
     ])
   })
 
+  it('renders a view-only form without a submit action when readonly', async () => {
+    updateAccountMock.mockReset()
+    const wrapper = mount(EditAccountModal, {
+      props: {
+        show: true,
+        account: buildAccount(),
+        proxies: [],
+        groups: [],
+        readonly: true
+      },
+      global: {
+        stubs: {
+          BaseDialog: BaseDialogStub,
+          Select: SelectStub,
+          Icon: true,
+          ProxySelector: true,
+          GroupSelector: GroupSelectorStub,
+          ModelWhitelistSelector: ModelWhitelistSelectorStub
+        }
+      }
+    })
+    expect(wrapper.find('[data-test="account-readonly-notice"]').exists()).toBe(true)
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
+    expect(wrapper.get('form#edit-account-form fieldset').attributes('disabled')).toBeDefined()
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock).not.toHaveBeenCalled()
+  })
+
   it('sets expiry presets from now instead of extending the saved expiry', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2028-02-29T12:34:00'))

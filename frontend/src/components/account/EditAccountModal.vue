@@ -1,7 +1,7 @@
 <template>
   <BaseDialog
     :show="show"
-    :title="t('admin.accounts.editAccount')"
+    :title="readonly ? t('admin.accounts.viewAccount') : t('admin.accounts.editAccount')"
     width="wide"
     @close="handleClose"
   >
@@ -9,8 +9,17 @@
       v-if="account"
       id="edit-account-form"
       @submit.prevent="handleSubmit"
-      class="space-y-5"
     >
+      <p
+        v-if="readonly"
+        class="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+        data-test="account-readonly-notice"
+      >
+        {{ t('admin.accounts.readonlyNotice') }}
+      </p>
+      <!-- A disabled fieldset turns off every native control in the form at once,
+           so a viewer who does not own the account can inspect it but not edit it. -->
+      <fieldset :disabled="readonly" class="space-y-5">
       <div>
         <label class="input-label">{{ t('common.name') }}</label>
         <input v-model="form.name" type="text" required class="input" data-tour="edit-account-form-name" />
@@ -1648,7 +1657,7 @@
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
           <ProxyAdBanner />
         </div>
-        <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
+        <ProxySelector v-model="form.proxy_id" :proxies="proxies" :allow-test="allowProxyTest && !readonly" />
       </div>
 
       <UpstreamRequestIdHeaderField
@@ -3050,14 +3059,16 @@
         data-tour="account-form-groups"
       />
 
+      </fieldset>
     </form>
 
     <template #footer>
       <div v-if="account" class="flex justify-end gap-3">
         <button @click="handleClose" type="button" class="btn btn-secondary">
-          {{ t('common.cancel') }}
+          {{ readonly ? t('common.close') : t('common.cancel') }}
         </button>
         <button
+          v-if="!readonly"
           type="submit"
           form="edit-account-form"
           :disabled="submitting"
@@ -3206,9 +3217,11 @@ interface Props {
   account: Account | null
   proxies: Proxy[]
   groups: AdminGroup[]
+  readonly?: boolean
+  allowProxyTest?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { readonly: false, allowProxyTest: true })
 const emit = defineEmits<{
   close: []
   updated: [account: Account]
@@ -5128,6 +5141,7 @@ const submitUpdateAccount = async (accountID: number, updatePayload: Record<stri
 }
 
 const handleSubmit = async () => {
+  if (props.readonly) return
   if (!props.account) return
   const accountID = props.account.id
 

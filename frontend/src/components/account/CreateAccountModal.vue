@@ -3019,7 +3019,7 @@
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
           <ProxyAdBanner />
         </div>
-        <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
+        <ProxySelector v-model="form.proxy_id" :proxies="proxies" :allow-test="allowProxyTest" />
       </div>
 
       <UpstreamRequestIdHeaderField
@@ -4094,9 +4094,10 @@ interface Props {
   show: boolean
   proxies: Proxy[]
   groups: AdminGroup[]
+  allowProxyTest?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { allowProxyTest: true })
 const emit = defineEmits<{
   close: []
   created: []

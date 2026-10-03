@@ -46,6 +46,9 @@
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
+            <!-- Proxy readers without write access (restricted administrators)
+                 only see masked endpoints, so management actions are hidden. -->
+            <template v-if="canManageProxies">
             <button
               @click="handleBatchTest"
               :disabled="batchTesting || loading"
@@ -83,6 +86,7 @@
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.proxies.createProxy') }}
             </button>
+            </template>
           </div>
         </div>
       </template>
@@ -135,7 +139,7 @@
           <template #cell-address="{ row }">
             <div class="flex items-center gap-1.5">
               <code class="code text-xs">{{ row.host }}:{{ row.port }}</code>
-              <div class="relative">
+              <div v-if="canManageProxies" class="relative">
                 <button
                   type="button"
                   class="rounded p-0.5 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
@@ -268,7 +272,8 @@
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
+            <span v-if="!canManageProxies" class="text-sm text-gray-400">-</span>
+            <div v-else class="flex items-center gap-1">
               <button
                 @click="handleTestConnection(row)"
                 :disabled="testingProxyIds.has(row.id)"
@@ -967,6 +972,8 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import { Permission } from '@/utils/permissions'
 import { adminAPI } from '@/api/admin'
 import type { Proxy, ProxyAccountSummary, ProxyProtocol, ProxyQualityCheckResult } from '@/types'
 import type { Column } from '@/components/common/types'
@@ -991,6 +998,8 @@ import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canManageProxies = computed(() => authStore.hasPermission(Permission.AdminProxiesWrite))
 const { copyToClipboard } = useClipboard()
 
 const columns = computed<Column[]>(() => [
