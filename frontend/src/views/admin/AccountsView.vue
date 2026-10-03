@@ -387,7 +387,13 @@
             />
           </template>
           <template #cell-priority="{ row, value }">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{ isRedactedAccount(row) ? '-' : value }}</span>
+            <AccountPriorityCell
+              v-if="canMutateAccount(row)"
+              :account="row"
+              @updated="handleAccountUpdated"
+              @error="(message: string) => appStore.showError(message)"
+            />
+            <span v-else class="text-sm text-gray-700 dark:text-gray-300">{{ isRedactedAccount(row) ? '-' : value }}</span>
           </template>
           <template #header-scheduler_score="{ column }">
             <div class="flex items-center">
@@ -535,6 +541,7 @@ import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vu
 import AccountGroupsCell from '@/components/account/AccountGroupsCell.vue'
 import AccountCapacityCell from '@/components/account/AccountCapacityCell.vue'
 import UpstreamBillingRateCell from '@/components/account/UpstreamBillingRateCell.vue'
+import AccountPriorityCell from '@/components/account/AccountPriorityCell.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRulesModal.vue'
