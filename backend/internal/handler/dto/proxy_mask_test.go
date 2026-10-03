@@ -38,7 +38,7 @@ func TestMaskedAdminProxyWithAccountCountHidesCopyableFields(t *testing.T) {
 
 	require.Equal(t, "10.****.40", out.Host)
 	require.Empty(t, out.Password)
-	require.Empty(t, out.AdminProxy.Proxy.Password)
+	require.Empty(t, out.Proxy.Password)
 	require.Equal(t, "203.****3.77", out.IPAddress)
 	require.Empty(t, out.LatencyMessage)
 	require.Equal(t, "HK", out.Country)
