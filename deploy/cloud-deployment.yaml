@@ -9,7 +9,7 @@ server:
 
 application:
   domain: sub.aipcloud.xyz
-  image: ghcr.io/joshuanibaba/sub2api:sha-b06e7478f023e3f5452110c463556e480a27763e
+  image: ghcr.io/joshuanibaba/sub2api:sha-e050453b4b91f67d4ac9dfa5675331ecd7baf6d0
   image_latest: ghcr.io/joshuanibaba/sub2api:latest
   container_name: sub2api
   listen_port: 8080
