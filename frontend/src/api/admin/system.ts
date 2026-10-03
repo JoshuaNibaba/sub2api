@@ -13,12 +13,13 @@ export interface ReleaseInfo {
 
 export interface VersionInfo {
   current_version: string
+  base_version?: string // upstream release a fork build is based on
   latest_version: string
   has_update: boolean
   release_info?: ReleaseInfo
   cached: boolean
   warning?: string
-  build_type: string // "source" for manual builds, "release" for CI builds
+  build_type: string // "source" for manual builds, "release" for CI builds, "fork" for fork CI builds
 }
 
 /**

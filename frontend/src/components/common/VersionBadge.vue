@@ -105,6 +105,13 @@
                     </svg>
                   </span>
                 </div>
+                <p
+                  v-if="baseVersion"
+                  data-test="version-base"
+                  class="mt-1 text-xs text-gray-500 dark:text-dark-400"
+                >
+                  {{ t('version.basedOn', { version: 'v' + baseVersion }) }}
+                </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
                   {{
                     hasUpdate
@@ -286,7 +293,7 @@
                     />
                   </svg>
                   <p class="text-xs text-blue-600 dark:text-blue-400">
-                    {{ t('version.sourceModeHint') }}
+                    {{ isForkBuild ? t('version.forkModeHint') : t('version.sourceModeHint') }}
                   </p>
                 </div>
               </div>
@@ -414,7 +421,7 @@
                           />
                         </svg>
                         <p class="min-w-0 flex-1 text-xs leading-4 text-blue-600 dark:text-blue-400">
-                          {{ t('version.rollbackSourceHint') }}
+                          {{ isForkBuild ? t('version.rollbackForkHint') : t('version.rollbackSourceHint') }}
                         </p>
                       </div>
 
@@ -673,6 +680,7 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const loading = computed(() => appStore.versionLoading)
 const currentVersion = computed(() => appStore.currentVersion || props.version || '')
 const latestVersion = computed(() => appStore.latestVersion)
+const baseVersion = computed(() => appStore.baseVersion)
 const hasUpdate = computed(() => appStore.hasUpdate)
 const releaseInfo = computed(() => appStore.releaseInfo)
 const buildType = computed(() => appStore.buildType)
@@ -730,6 +738,7 @@ const activeManualCommand = computed(() =>
 
 // Only show update check for release builds (binary/docker deployment)
 const isReleaseBuild = computed(() => buildType.value === 'release')
+const isForkBuild = computed(() => buildType.value === 'fork')
 
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value

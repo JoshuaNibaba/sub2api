@@ -144,8 +144,9 @@ func runMainServer() {
 	}
 
 	buildInfo := handler.BuildInfo{
-		Version:   Version,
-		BuildType: BuildType,
+		Version:     Version,
+		BaseVersion: strings.TrimSpace(embeddedVersion),
+		BuildType:   BuildType,
 	}
 
 	app, err := initializeApplication(buildInfo)

@@ -40,6 +40,7 @@ export const useAppStore = defineStore('app', () => {
   const versionLoading = ref<boolean>(false)
   const currentVersion = ref<string>('')
   const latestVersion = ref<string>('')
+  const baseVersion = ref<string>('')
   const hasUpdate = ref<boolean>(false)
   const buildType = ref<string>('source')
   const releaseInfo = ref<ReleaseInfo | null>(null)
@@ -245,6 +246,7 @@ export const useAppStore = defineStore('app', () => {
     if (versionLoaded.value && !force) {
       return {
         current_version: currentVersion.value,
+        base_version: baseVersion.value || undefined,
         latest_version: latestVersion.value,
         has_update: hasUpdate.value,
         build_type: buildType.value,
@@ -263,6 +265,7 @@ export const useAppStore = defineStore('app', () => {
       const data = await checkUpdatesAPI(force)
       currentVersion.value = data.current_version
       latestVersion.value = data.latest_version
+      baseVersion.value = data.base_version || ''
       hasUpdate.value = data.has_update
       buildType.value = data.build_type || 'source'
       releaseInfo.value = data.release_info || null
@@ -459,6 +462,7 @@ export const useAppStore = defineStore('app', () => {
     versionLoading,
     currentVersion,
     latestVersion,
+    baseVersion,
     hasUpdate,
     buildType,
     releaseInfo,

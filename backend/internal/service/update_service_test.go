@@ -185,3 +185,44 @@ func TestUpdateServiceRollbackToVersionAcceptsVPrefix(t *testing.T) {
 	require.NotErrorIs(t, err, ErrRollbackVersionNotAllowed)
 	require.Contains(t, err.Error(), "no compatible release found")
 }
+
+func TestUpdateServiceForkBuildComparesBaseVersion(t *testing.T) {
+	newFork := func(base, latest string) *UpdateService {
+		return NewUpdateService(
+			&updateServiceCacheStub{},
+			&updateServiceGitHubClientStub{release: &GitHubRelease{TagName: "v" + latest}},
+			"main-19",
+			"release",
+		).WithBaseVersion(base)
+	}
+
+	info, err := newFork("0.2.13", "0.2.13").CheckUpdate(context.Background(), true)
+	require.NoError(t, err)
+	require.Equal(t, "main-19", info.CurrentVersion)
+	require.Equal(t, "0.2.13", info.BaseVersion)
+	require.Equal(t, BuildTypeFork, info.BuildType)
+	require.False(t, info.HasUpdate, "fork based on the latest upstream release is up to date")
+
+	info, err = newFork("0.2.11", "0.2.13").CheckUpdate(context.Background(), true)
+	require.NoError(t, err)
+	require.True(t, info.HasUpdate)
+}
+
+func TestUpdateServiceForkBuildRefusesInPlaceUpdate(t *testing.T) {
+	svc := NewUpdateService(
+		&updateServiceCacheStub{},
+		&updateServiceGitHubClientStub{release: &GitHubRelease{TagName: "v0.2.13"}},
+		"main-19",
+		"release",
+	).WithBaseVersion("0.2.11")
+
+	require.ErrorIs(t, svc.PerformUpdate(context.Background()), ErrForkBuildInPlaceUpdate)
+	require.ErrorIs(t, svc.Rollback(), ErrForkBuildInPlaceUpdate)
+	require.ErrorIs(t, svc.RollbackToVersion(context.Background(), "0.2.10"), ErrForkBuildInPlaceUpdate)
+}
+
+func TestUpdateServiceWithMatchingBaseVersionKeepsBuildType(t *testing.T) {
+	svc := NewUpdateService(&updateServiceCacheStub{}, &updateServiceGitHubClientStub{}, "0.2.13", "release").WithBaseVersion("0.2.13")
+	require.Equal(t, "release", svc.buildType)
+	require.Empty(t, svc.baseVersion)
+}
