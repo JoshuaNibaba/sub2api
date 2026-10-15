@@ -525,7 +525,7 @@ func expectAdminBootstrapCounts(mock sqlmock.Sqlmock, totalUsers, adminUsers int
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(1) FROM users")).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(totalUsers))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(1) FROM users WHERE role = $1")).
-		WithArgs(service.RoleAdmin).
+		WithArgs(service.RoleSuperAdmin).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(adminUsers))
 }
 
@@ -598,7 +598,7 @@ func TestBootstrapAdminUserCreatesAdminWithGeneratedCredentials(t *testing.T) {
 	expectAdminBootstrapCounts(mock, 0, 0)
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users")).
 		WithArgs(
-			sqlmock.AnyArg(), sqlmock.AnyArg(), service.RoleAdmin, sqlmock.AnyArg(),
+			sqlmock.AnyArg(), sqlmock.AnyArg(), service.RoleSuperAdmin, sqlmock.AnyArg(),
 			sqlmock.AnyArg(), service.StatusActive, sqlmock.AnyArg(), sqlmock.AnyArg(),
 		).
 		WillReturnResult(sqlmock.NewResult(1, 1))
