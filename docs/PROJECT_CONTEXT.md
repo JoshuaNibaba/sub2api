@@ -271,6 +271,21 @@ git push -u origin feat/<short-name>
 
 `.env`、密钥与数据库凭据只保存在服务器上，不进入仓库。
 
+2026-10-15 部署补充：GitHub 返回该仓库 Actions 已停用，当前线上镜像为服务器本地镜像
+`sub2api-fork:0.2.16-085ebbe94`。源码已同步到个人仓库 `main`，合入上游
+`1b2243a4f`（v0.2.16 基线及 Gemini 4 Argon 后续支持）。本次在本地使用 Go 1.27.2
+构建带前端的 Linux amd64 程序，在服务器基于原运行镜像构建新镜像，同时复制新版
+`backend/resources`（包含 Gemini 4 价格表）。构建目录、源码提交和升级前备份目录见
+`deploy/cloud-deployment.yaml`；该文件的 `image_latest` 仍是自动发布目标，不能代表当前运行版本。
+恢复自动发布前，可按该构建目录中的 `Dockerfile` 和 `upgrade.sh` 核对手动发布流程；
+再次升级需更新脚本中的预期旧镜像、版本和构建目录。
+
+本次验证包括前端生产构建、lint、374 个测试文件共 2,876 项测试，以及后端单元测试、
+集成测试命令和 golangci-lint（0 问题）。本机未提供 Docker，依赖 Docker 的集成用例会跳过；
+Docker Compose simple-mode 环境测试已在服务器执行通过。部署后须继续核对 `/health`、
+`/api/v1/settings/public` 的版本和数据库迁移记录。当前账号池没有 Gemini/Antigravity 账号，
+实际 Gemini 4 调用需要另行配置具备对应权限的上游账号。
+
 ## 12. 当前开发注意事项
 
 - `DEV_GUIDE.md` 继承自上游社区的通用开发笔记，其中 Windows 相关条目仅供参考；本项目以本文件记录的 `JoshuaNibaba/sub2api` 和当前 macOS 环境为准。

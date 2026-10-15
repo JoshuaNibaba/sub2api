@@ -9,10 +9,16 @@ server:
 
 application:
   domain: sub.aipcloud.xyz
-  image: ghcr.io/joshuanibaba/sub2api:sha-e050453b4b91f67d4ac9dfa5675331ecd7baf6d0
+  image: sub2api-fork:0.2.16-085ebbe94
   image_latest: ghcr.io/joshuanibaba/sub2api:latest
   container_name: sub2api
   listen_port: 8080
+  version: 0.2.16-fork
+  source_commit: 085ebbe94ba4f914609e6c44cd4f17a01401cc89
+  upstream_commit: 1b2243a4f
+  deployed_at: "2026-10-15T22:20:32+08:00"
+  build_directory: /opt/sub2api/upgrades/20261015-gemini4-085ebbe94
+  backup_directory: /opt/sub2api/backups/pre-gemini4-20261015T142021Z
 
 nginx:
   upstream_host: 127.0.0.1
