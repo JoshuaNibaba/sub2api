@@ -271,7 +271,7 @@ git push -u origin feat/<short-name>
 
 `.env`、密钥与数据库凭据只保存在服务器上，不进入仓库。
 
-2026-10-15 部署补充：GitHub 返回该仓库 Actions 已停用，当前线上镜像为服务器本地镜像
+2026-10-15 部署补充：GitHub 返回该仓库 Actions 已停用，当次部署镜像为服务器本地镜像
 `sub2api-fork:0.2.16-085ebbe94`。源码已同步到个人仓库 `main`，合入上游
 `1b2243a4f`（v0.2.16 基线及 Gemini 4 Argon 后续支持）。本次在本地使用 Go 1.27.2
 构建带前端的 Linux amd64 程序，在服务器基于原运行镜像构建新镜像，同时复制新版
@@ -285,6 +285,19 @@ git push -u origin feat/<short-name>
 Docker Compose simple-mode 环境测试已在服务器执行通过。部署后须继续核对 `/health`、
 `/api/v1/settings/public` 的版本和数据库迁移记录。当前账号池没有 Gemini/Antigravity 账号，
 实际 Gemini 4 调用需要另行配置具备对应权限的上游账号。
+
+2026-10-16 升级至官方 `v0.2.17`（上游 `060d0160417782cd962a0c7f460f6cd4565d4916`），
+保留 Fork 定制，源码提交为 `686d889bcb38930612031076029c653e9508e222`。当前线上镜像为
+`sub2api-fork:0.2.17-686d889bc`，版本 `0.2.17-fork`。使用 Go 1.27.2 构建带前端的
+Linux amd64 程序，基于原运行镜像打包，并同步运行资源。部署前已备份数据库、应用数据和
+Compose override；构建及备份目录见 `deploy/cloud-deployment.yaml`。容器已确认 healthy，
+公网 `/health`、版本接口和前端资源已核验，程序与价格资源的 SHA256 与构建产物一致。
+本次未新增或修改迁移，升级前后均为 298 条迁移记录。
+
+本次前端生产构建、lint、374 个文件共 2,879 项测试及后端单元测试通过，
+golangci-lint v2.14.0 报告 0 问题。获得 Docker 权限后，补跑全量后端集成测试通过，
+包含 PostgreSQL/Redis 容器用例；同时修正 `GetFirstAdmin` 的历史集成测试数据，
+使其符合 Fork 已有的超级管理员初始化规则，并覆盖普通管理员不能成为初始管理员的边界。
 
 ## 12. 当前开发注意事项
 
