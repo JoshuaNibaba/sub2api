@@ -646,14 +646,21 @@ func (s *UserRepoSuite) TestRemoveGroupFromAllowedGroups_NoMatch() {
 // --- GetFirstAdmin ---
 
 func (s *UserRepoSuite) TestGetFirstAdmin() {
+	// The fork reserves bootstrap ownership for super admins, even when an
+	// older active restricted admin exists.
+	s.mustCreateUser(&service.User{
+		Email:  "restricted@example.com",
+		Role:   service.RoleAdmin,
+		Status: service.StatusActive,
+	})
 	admin1 := s.mustCreateUser(&service.User{
 		Email:  "admin1@example.com",
-		Role:   service.RoleAdmin,
+		Role:   service.RoleSuperAdmin,
 		Status: service.StatusActive,
 	})
 	s.mustCreateUser(&service.User{
 		Email:  "admin2@example.com",
-		Role:   service.RoleAdmin,
+		Role:   service.RoleSuperAdmin,
 		Status: service.StatusActive,
 	})
 
@@ -668,20 +675,25 @@ func (s *UserRepoSuite) TestGetFirstAdmin_NoAdmin() {
 		Role:   service.RoleUser,
 		Status: service.StatusActive,
 	})
+	s.mustCreateUser(&service.User{
+		Email:  "restricted@example.com",
+		Role:   service.RoleAdmin,
+		Status: service.StatusActive,
+	})
 
 	_, err := s.repo.GetFirstAdmin(s.ctx)
-	s.Require().Error(err, "expected error when no admin exists")
+	s.Require().Error(err, "expected error when no super admin exists")
 }
 
 func (s *UserRepoSuite) TestGetFirstAdmin_DisabledAdminIgnored() {
 	s.mustCreateUser(&service.User{
 		Email:  "disabled@example.com",
-		Role:   service.RoleAdmin,
+		Role:   service.RoleSuperAdmin,
 		Status: service.StatusDisabled,
 	})
 	activeAdmin := s.mustCreateUser(&service.User{
 		Email:  "active@example.com",
-		Role:   service.RoleAdmin,
+		Role:   service.RoleSuperAdmin,
 		Status: service.StatusActive,
 	})
 
