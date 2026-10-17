@@ -492,7 +492,7 @@ func registerGeminiOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerAntigravityOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	antigravity := admin.Group("/antigravity")
-	antigravity.Use(middleware.RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead))
+	antigravity.Use(middleware.RequireAntigravityOAuthRouteAccess())
 	{
 		antigravity.POST("/oauth/auth-url", h.Admin.AntigravityOAuth.GenerateAuthURL)
 		antigravity.POST("/oauth/exchange-code", h.Admin.AntigravityOAuth.ExchangeCode)

@@ -73,3 +73,29 @@ func TestAccountResponsesMaskNonOwnedProxyForRestrictedAdmin(t *testing.T) {
 		}
 	}
 }
+
+func TestAntigravityDefaultModelMappingPermissions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, role := range []string{service.RoleAdmin, service.RoleSuperAdmin, service.RoleUser, service.RoleEnterpriseUser, ""} {
+		t.Run(role, func(t *testing.T) {
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				c.Set(string(servermiddleware.ContextKeyUserRole), role)
+				c.Next()
+			})
+			handler := &AccountHandler{}
+			group := router.Group("/api/v1/admin/accounts", servermiddleware.RequireAccountRouteAccess(nil))
+			group.GET("/antigravity/default-model-mapping", handler.GetAntigravityDefaultModelMapping)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/antigravity/default-model-mapping", nil))
+			want := http.StatusForbidden
+			if service.IsStaffRole(role) {
+				want = http.StatusOK
+				require.Contains(t, w.Body.String(), "claude")
+			} else if role == "" {
+				want = http.StatusUnauthorized
+			}
+			require.Equal(t, want, w.Code)
+		})
+	}
+}

@@ -186,6 +186,27 @@ func RequireOpenAIOAuthRouteAccess() gin.HandlerFunc {
 	}
 }
 
+// RequireAntigravityOAuthRouteAccess permits new-account OAuth and refresh-token
+// import using credentials supplied by the operator. It does not grant access
+// to stored credentials or existing-account mutations.
+func RequireAntigravityOAuthRouteAccess() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodPost {
+			for _, path := range []string{
+				"/admin/antigravity/oauth/auth-url",
+				"/admin/antigravity/oauth/exchange-code",
+				"/admin/antigravity/oauth/refresh-token",
+			} {
+				if strings.HasSuffix(c.FullPath(), path) {
+					RequireAnyPermission(service.PermissionAdminCredentialsRead, service.PermissionAdminAccountsOwnedWrite)(c)
+					return
+				}
+			}
+		}
+		RequireReadWritePermission(service.PermissionAdminAccountsRead, service.PermissionAdminCredentialsRead)(c)
+	}
+}
+
 // RequireOwnedAccountParam guards account-scoped routes that live outside the
 // /admin/accounts group — the provider-specific quota, balance and plan
 // endpoints. Those groups are reachable with admin.accounts.read alone, so
@@ -254,9 +275,10 @@ func RequireOwnedAccountVia(resolve RouteAccountResolver, resolver AccountOwners
 
 // restrictedAdminSharedAccountReadSuffixes are the per-account reads a
 // restricted administrator may perform on any account in the pool: the detail
-// view (served with its proxy masked) and the usage statistics. Reads that
-// query the upstream provider with the account's own session stay owner-only.
+// view (served with its proxy masked), usage statistics and platform model
+// defaults. Reads using the account's upstream session stay owner-only.
 var restrictedAdminSharedAccountReadSuffixes = []string{
+	"/admin/accounts/antigravity/default-model-mapping",
 	"/admin/accounts/:id",
 	"/admin/accounts/:id/stats",
 	"/admin/accounts/:id/usage",

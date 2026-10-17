@@ -275,6 +275,29 @@ func TestRequireOpenAIOAuthRouteAccessPreservesExistingAccountPolicy(t *testing.
 	}
 }
 
+func TestRequireAntigravityOAuthRouteAccessDoesNotAllowOtherWrites(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, role := range []string{service.RoleAdmin, service.RoleSuperAdmin, service.RoleUser, service.RoleEnterpriseUser} {
+		for _, path := range []string{"/oauth/export", "/accounts/:id/refresh"} {
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				c.Set(string(ContextKeyUserRole), role)
+				c.Next()
+			})
+			group := router.Group("/api/v1/admin/antigravity", RequireAntigravityOAuthRouteAccess())
+			group.POST(path, func(c *gin.Context) { c.Status(http.StatusOK) })
+			w := httptest.NewRecorder()
+			target := strings.Replace(path, ":id", "42", 1)
+			router.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/admin/antigravity"+target, nil))
+			want := http.StatusForbidden
+			if role == service.RoleSuperAdmin {
+				want = http.StatusOK
+			}
+			require.Equal(t, want, w.Code, "role=%s path=%s", role, path)
+		}
+	}
+}
+
 func TestRequireOwnedAccountViaResolvesParentAccount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	request := func(owned bool, resolve RouteAccountResolver) int {
