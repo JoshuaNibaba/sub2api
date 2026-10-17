@@ -287,7 +287,7 @@ Docker Compose simple-mode 环境测试已在服务器执行通过。部署后�
 实际 Gemini 4 调用需要另行配置具备对应权限的上游账号。
 
 2026-10-16 升级至官方 `v0.2.17`（上游 `060d0160417782cd962a0c7f460f6cd4565d4916`），
-保留 Fork 定制，源码提交为 `686d889bcb38930612031076029c653e9508e222`。当前线上镜像为
+保留 Fork 定制，源码提交为 `686d889bcb38930612031076029c653e9508e222`。当次部署镜像为
 `sub2api-fork:0.2.17-686d889bc`，版本 `0.2.17-fork`。使用 Go 1.27.2 构建带前端的
 Linux amd64 程序，基于原运行镜像打包，并同步运行资源。部署前已备份数据库、应用数据和
 Compose override；构建及备份目录见 `deploy/cloud-deployment.yaml`。容器已确认 healthy，
@@ -298,6 +298,14 @@ Compose override；构建及备份目录见 `deploy/cloud-deployment.yaml`。容
 golangci-lint v2.14.0 报告 0 问题。获得 Docker 权限后，补跑全量后端集成测试通过，
 包含 PostgreSQL/Redis 容器用例；同时修正 `GetFirstAdmin` 的历史集成测试数据，
 使其符合 Fork 已有的超级管理员初始化规则，并覆盖普通管理员不能成为初始管理员的边界。
+
+2026-10-17 修正 Google/Antigravity 账号测试空输出，源码提交
+`901b81c4a2bc8f89ad45281ebbf6933a5d517372`，当前镜像为
+`sub2api-fork:0.2.17-google-test-901b81c4a`，版本仍为 `0.2.17-fork`。
+原测试只允许输出 1 token，实测上游返回 HTTP 200、`finishReason=MAX_TOKENS` 和空内容；
+现改用简短确认提示词、1024 token 输出上限，并将没有文本和图片的响应作为测试失败。
+同一账号的 Gemini 3 Flash 与 Gemini 4 Argon High 已实测返回 OK；专项回归、全量后端单元测试
+及 golangci-lint（0 问题）通过。部署前已备份数据库、应用数据和 Compose 配置。
 
 ## 12. 当前开发注意事项
 
