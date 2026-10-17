@@ -9,16 +9,16 @@ server:
 
 application:
   domain: sub.aipcloud.xyz
-  image: sub2api-fork:0.2.17-google-test-901b81c4a
+  image: sub2api-fork:0.2.17-admin-permissions-7f9b704ed
   image_latest: ghcr.io/joshuanibaba/sub2api:latest
   container_name: sub2api
   listen_port: 8080
   version: 0.2.17-fork
-  source_commit: 901b81c4a2bc8f89ad45281ebbf6933a5d517372
+  source_commit: 7f9b704ed84721bcb1fc691d28e5e5ba47427e8c
   upstream_commit: 060d0160417782cd962a0c7f460f6cd4565d4916
-  deployed_at: "2026-10-17T05:37:40Z"
-  build_directory: /opt/sub2api/upgrades/20261017-google-test-901b81c4a
-  backup_directory: /opt/sub2api/backups/pre-google-test-20261017T053731Z
+  deployed_at: "2026-10-17T13:51:33Z"
+  build_directory: /opt/sub2api/upgrades/20261017-admin-permissions-7f9b704ed
+  backup_directory: /opt/sub2api/backups/pre-admin-permissions-20261017T135125Z
 
 nginx:
   upstream_host: 127.0.0.1
