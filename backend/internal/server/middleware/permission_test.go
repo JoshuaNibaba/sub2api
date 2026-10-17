@@ -108,7 +108,6 @@ func TestRequireAccountRouteAccessAllowsOwnedAccountOperations(t *testing.T) {
 		route  string
 		target string
 	}{
-		{http.MethodPost, "/:id/test", "/42/test"},
 		{http.MethodPost, "/:id/clear-error", "/42/clear-error"},
 		{http.MethodPost, "/:id/clear-rate-limit", "/42/clear-rate-limit"},
 		{http.MethodPost, "/:id/recover-state", "/42/recover-state"},
@@ -154,7 +153,7 @@ func TestRequireAccountRouteAccessAllowsOwnedAccountOperations(t *testing.T) {
 
 // Restricted administrators read the whole pool: the detail view and usage
 // statistics of accounts they do not own stay open, while upstream-querying
-// reads and every mutation remain owner-only.
+// reads and account updates remain owner-only. Connectivity tests are shared.
 func TestRequireAccountRouteAccessAllowsSharedAccountReads(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	request := func(method, route, target string) int {
@@ -179,6 +178,31 @@ func TestRequireAccountRouteAccessAllowsSharedAccountReads(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, request(http.MethodGet, "/:id/ollama-cloud-usage", "/42/ollama-cloud-usage"))
 	require.Equal(t, http.StatusForbidden, request(http.MethodPut, "/:id", "/42"))
 	require.Equal(t, http.StatusForbidden, request(http.MethodDelete, "/:id/temp-unschedulable", "/42/temp-unschedulable"))
+}
+
+func TestRequireAccountRouteAccessAllowsSharedConnectivityTests(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, role := range []string{service.RoleAdmin, service.RoleSuperAdmin, service.RoleUser, service.RoleEnterpriseUser, ""} {
+		for _, owned := range []bool{false, true} {
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Set(string(ContextKeyUserRole), role)
+				c.Set(string(ContextKeyUser), AuthSubject{UserID: 7})
+				c.Next()
+			})
+			group := r.Group("/api/v1/admin/accounts", RequireAccountRouteAccess(accountOwnershipStub{owned: owned}))
+			group.POST("/:id/test", func(c *gin.Context) { c.Status(http.StatusOK) })
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/42/test", nil))
+			want := http.StatusForbidden
+			if service.IsStaffRole(role) {
+				want = http.StatusOK
+			} else if role == "" {
+				want = http.StatusUnauthorized
+			}
+			require.Equal(t, want, w.Code, "role=%s owned=%v", role, owned)
+		}
+	}
 }
 
 func TestRequireAccountRouteAccessDeniesExportToRestrictedAdmin(t *testing.T) {

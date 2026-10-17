@@ -15,7 +15,8 @@ const {
   getAllGroups,
   refreshCredentials,
   showError,
-  showWarning
+  showWarning,
+  authState
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
@@ -26,7 +27,8 @@ const {
   getAllGroups: vi.fn(),
   refreshCredentials: vi.fn(),
   showError: vi.fn(),
-  showWarning: vi.fn()
+  showWarning: vi.fn(),
+  authState: { isSuperAdmin: true }
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -53,13 +55,11 @@ vi.mock('@/stores/app', () => ({
 }))
 
 vi.mock('@/stores/auth', () => ({
-  // These specs exercise the account table as a super administrator: nothing is
-  // redacted and every row action is available.
   useAuthStore: () => ({
     token: 'test-token',
     isSimpleMode: false,
     isAdmin: true,
-    isSuperAdmin: true,
+    get isSuperAdmin() { return authState.isSuperAdmin },
     user: { id: 1 },
     hasPermission: () => false
   })
@@ -88,7 +88,7 @@ const AccountGroupsCellStub = defineComponent({
 })
 
 const EditAccountModalStub = defineComponent({
-  props: { show: Boolean, account: { type: Object, default: null } },
+  props: { show: Boolean, account: { type: Object, default: null }, readonly: Boolean },
   template: '<div data-test="edit-account">{{ show ? account?.name : "" }}</div>'
 })
 
@@ -167,6 +167,7 @@ const fullAccount = {
 
 describe('admin AccountsView lite account list', () => {
   beforeEach(() => {
+    authState.isSuperAdmin = true
     localStorage.clear()
     listAccounts.mockReset().mockResolvedValue({ items: [listRow], total: 1, page: 1, page_size: 20, pages: 1 })
     listWithEtag.mockReset().mockResolvedValue({ notModified: true, etag: 'compact-etag', data: null })
@@ -285,6 +286,50 @@ describe('admin AccountsView lite account list', () => {
     expect(refreshCredentials).toHaveBeenCalledWith(42)
     expect(wrapper.get('[data-account-name]').attributes('data-account-name')).toBe('refreshed account')
     expect(showWarning).toHaveBeenCalledWith('Token refreshed, but project_id is temporarily unavailable')
+    wrapper.unmount()
+  })
+
+  it.each([null, 9])('lets an admin edit in readonly mode and test an account owned by %s', async ownerID => {
+    authState.isSuperAdmin = false
+    const row = { ...listRow, owner_user_id: ownerID }
+    listAccounts.mockResolvedValue({ items: [row], total: 1, page: 1, page_size: 20, pages: 1 })
+    getById.mockResolvedValue({ ...fullAccount, owner_user_id: ownerID })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const actions = wrapper.get('[data-test="account-readonly-actions"]')
+    const edit = actions.findAll('button').find(button => button.text() === 'common.edit')!
+    await edit.trigger('click')
+    await flushPromises()
+    expect(wrapper.getComponent(EditAccountModalStub).props('readonly')).toBe(true)
+    expect(wrapper.get('[data-test="edit-account"]').text()).toBe('compact row')
+    expect(wrapper.findAll('button').some(button => button.text() === 'common.delete')).toBe(false)
+
+    const test = actions.findAll('button').find(button => button.text() === 'admin.accounts.testConnection')!
+    await test.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="test-account"]').text()).toBe('compact row')
+    expect(getById).toHaveBeenCalledWith(42)
+    wrapper.unmount()
+  })
+
+  it('lets an admin update their own account and uses fresh ownership when opening edit', async () => {
+    authState.isSuperAdmin = false
+    const row = { ...listRow, owner_user_id: 1 }
+    listAccounts.mockResolvedValue({ items: [row], total: 1, page: 1, page_size: 20, pages: 1 })
+    getById.mockResolvedValue({ ...fullAccount, owner_user_id: 1 })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const edit = wrapper.findAll('button').find(button => button.text() === 'common.edit')!
+    await edit.trigger('click')
+    await flushPromises()
+    expect(wrapper.getComponent(EditAccountModalStub).props('readonly')).toBe(false)
+
+    getById.mockResolvedValue({ ...fullAccount, owner_user_id: 9 })
+    await edit.trigger('click')
+    await flushPromises()
+    expect(wrapper.getComponent(EditAccountModalStub).props('readonly')).toBe(true)
     wrapper.unmount()
   })
 

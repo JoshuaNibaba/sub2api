@@ -1778,9 +1778,15 @@
       <div v-if="!isSparkShadow">
         <div class="mb-1 flex items-center gap-2">
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
-          <ProxyAdBanner />
+          <ProxyAdBanner v-if="!readonly" />
         </div>
-        <ProxySelector v-model="form.proxy_id" :proxies="proxies" :allow-test="allowProxyTest && !readonly" />
+        <div v-if="readonly" class="input text-gray-500 dark:text-dark-400" data-test="account-readonly-proxy">
+          <template v-if="account.proxy">
+            {{ account.proxy.name }} ({{ account.proxy.protocol }}://{{ account.proxy.host }}:{{ account.proxy.port }})
+          </template>
+          <template v-else>{{ t('admin.accounts.noProxy') }}</template>
+        </div>
+        <ProxySelector v-else v-model="form.proxy_id" :proxies="proxies" :allow-test="allowProxyTest" />
       </div>
 
       <UpstreamRequestIdHeaderField

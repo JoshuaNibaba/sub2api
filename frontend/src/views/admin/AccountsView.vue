@@ -446,9 +446,13 @@
           <template #cell-actions="{ row }">
             <span v-if="enterpriseReadOnly" class="text-sm text-gray-400">-</span>
             <div v-else-if="!canMutateAccount(row)" class="flex items-center gap-1" data-test="account-readonly-actions">
-              <button @click="handleView(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
-                <Icon name="eye" size="sm" />
-                <span class="text-xs">{{ t('common.view') }}</span>
+              <button @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
+                <Icon name="edit" size="sm" />
+                <span class="text-xs">{{ t('common.edit') }}</span>
+              </button>
+              <button @click="handleTest(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
+                <Icon name="play" size="sm" />
+                <span class="text-xs">{{ t('admin.accounts.testConnection') }}</span>
               </button>
               <button @click="handleViewStats(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-indigo-600 dark:hover:bg-dark-700 dark:hover:text-indigo-400">
                 <Icon name="chart" size="sm" />
@@ -1955,16 +1959,7 @@ const handleEdit = async (a: AccountListItem) => {
   const account = await loadAccountDetails(a)
   if (!account) return
   edAcc.value = account
-  edReadOnly.value = false
-  showEdit.value = true
-}
-// Restricted administrators may inspect any account in the pool; accounts they
-// do not own open in the same modal with every control disabled.
-const handleView = async (a: AccountListItem) => {
-  const account = await loadAccountDetails(a)
-  if (!account) return
-  edAcc.value = account
-  edReadOnly.value = true
+  edReadOnly.value = !canMutateAccount(account)
   showEdit.value = true
 }
 const openMenu = (a: Account, e: MouseEvent) => {

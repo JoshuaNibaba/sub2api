@@ -18,8 +18,8 @@ type AccountOwnershipResolver interface {
 }
 
 // RequireAccountRouteAccess gives super administrators the full account API,
-// while restricted administrators may create accounts and operate only on the
-// accounts they own, through any /admin/accounts/:id... endpoint. The OAuth
+// while restricted administrators may inspect and test all accounts, create
+// accounts and modify only the accounts they own. The OAuth
 // bootstrap endpoints are also allowed because they create a new account for
 // the current operator; account ownership is assigned by the create handler.
 // Operations that address no single account (bulk updates, batch credential
@@ -74,6 +74,12 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 		}
 
 		path := c.FullPath()
+		// Connectivity tests are available for the whole pool. This exception
+		// does not grant access to other account mutations or credential APIs.
+		if c.Request.Method == http.MethodPost && strings.HasSuffix(path, "/admin/accounts/:id/test") {
+			c.Next()
+			return
+		}
 		// These POST endpoints are read-only previews/batch queries used by the
 		// account UI and must remain available to restricted administrators.
 		for _, readOnlyPath := range []string{
@@ -102,7 +108,7 @@ func RequireAccountRouteAccess(resolver AccountOwnershipResolver) gin.HandlerFun
 			return
 		}
 		// Owning an account means being able to run it, not just rename it: the
-		// row actions on the account page (test, clear error, recover state,
+		// row actions on the account page (clear error, recover state,
 		// reset quota, schedulability, model sync, probe toggles) all address
 		// /admin/accounts/:id/..., and a restricted administrator who can PUT
 		// and DELETE an account but cannot clear its rate limit is unable to do

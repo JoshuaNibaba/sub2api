@@ -382,6 +382,21 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock).not.toHaveBeenCalled()
   })
 
+  it('shows the masked account proxy in readonly mode even when it is absent from the proxy list', async () => {
+    const account = {
+      ...buildAccount(),
+      proxy_id: 27,
+      proxy: { id: 27, name: 'shared-proxy', protocol: 'socks5h', host: 'pro****com', port: 1080 }
+    }
+    const wrapper = mountModal(account)
+    await wrapper.setProps({ readonly: true })
+
+    expect(wrapper.get('[data-test="account-readonly-proxy"]').text()).toContain('shared-proxy (socks5h://pro****com:1080)')
+    expect(wrapper.findComponent({ name: 'ProxySelector' }).exists()).toBe(false)
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('sets expiry presets from now instead of extending the saved expiry', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2028-02-29T12:34:00'))
