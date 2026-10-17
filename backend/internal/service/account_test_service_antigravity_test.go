@@ -3,11 +3,91 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestAntigravityConnectionTest_VisibleOutput(t *testing.T) {
+	const textResponse = `data: {"response":{"candidates":[{"content":{"parts":[{"text":"OK."}]},"finishReason":"STOP"}]}}` + "\n\n"
+	const imageResponse = `data: {"response":{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"QUJD"}}]}}]}}` + "\n\n"
+	for _, tc := range []struct {
+		name     string
+		model    string
+		prompt   string
+		response string
+		wantErr  bool
+		image    bool
+	}{
+		{name: "Gemini confirmation", model: "gemini-3-flash", response: textResponse},
+		{name: "Claude confirmation", model: "claude-sonnet-4-6", response: textResponse},
+		{name: "Gemini custom prompt", model: "gemini-3-flash", prompt: "  Say hello.  ", response: textResponse},
+		{name: "Claude custom prompt", model: "claude-sonnet-4-6", prompt: `Say "hello".`, response: textResponse},
+		{name: "output budget exhausted", model: "gemini-3-flash", response: `data: {"response":{"candidates":[{"content":{"parts":[{"text":""}]},"finishReason":"MAX_TOKENS"}]}}` + "\n\n", wantErr: true},
+		{name: "whitespace only", model: "gemini-3-flash", response: `data: {"response":{"candidates":[{"content":{"parts":[{"text":" "}]},"finishReason":"STOP"}]}}` + "\n\n", wantErr: true},
+		{name: "image only", model: "gemini-3.1-flash-image", response: imageResponse, image: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+				Body:       io.NopCloser(strings.NewReader(tc.response)),
+			}}}
+			svc := &AntigravityGatewayService{
+				tokenProvider: &AntigravityTokenProvider{},
+				httpUpstream:  upstream,
+			}
+			account := &Account{
+				ID: 1, Platform: PlatformAntigravity, Type: AccountTypeOAuth,
+				Concurrency: 1,
+				Credentials: map[string]any{
+					"access_token": "test-token", "project_id": "test-project",
+					"model_mapping": map[string]any{tc.model: tc.model},
+				},
+			}
+			result, err := svc.TestConnectionWithPrompt(context.Background(), account, tc.model, tc.prompt)
+			if tc.wantErr {
+				require.ErrorContains(t, err, "未返回文本或图片")
+				require.Nil(t, result, "empty responses must not be reported as successful tests")
+			} else {
+				require.NoError(t, err)
+				if tc.image {
+					require.Len(t, result.Images, 1)
+					require.Empty(t, result.Text)
+				} else {
+					require.Equal(t, "OK.", result.Text)
+				}
+			}
+			require.Len(t, upstream.requestBodies, 1)
+			var request struct {
+				Request struct {
+					GenerationConfig struct {
+						MaxOutputTokens int `json:"maxOutputTokens"`
+					} `json:"generationConfig"`
+					Contents []struct {
+						Parts []struct {
+							Text string `json:"text"`
+						} `json:"parts"`
+					} `json:"contents"`
+				} `json:"request"`
+			}
+			require.NoError(t, json.Unmarshal(upstream.requestBodies[0], &request))
+			if !tc.image {
+				require.GreaterOrEqual(t, request.Request.GenerationConfig.MaxOutputTokens, 1024)
+				wantPrompt := strings.TrimSpace(tc.prompt)
+				if wantPrompt == "" {
+					wantPrompt = "Reply with exactly OK."
+				}
+				require.Equal(t, wantPrompt, request.Request.Contents[0].Parts[0].Text)
+			}
+		})
+	}
+}
 
 func TestAntigravityConnectionTestModel(t *testing.T) {
 	t.Parallel()

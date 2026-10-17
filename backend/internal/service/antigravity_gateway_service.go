@@ -357,6 +357,18 @@ type TestConnectionResult struct {
 	MappedModel string                // 实际使用的模型
 }
 
+const (
+	antigravityTextTestPrompt    = "Reply with exactly OK."
+	antigravityTextTestMaxTokens = 1024
+)
+
+func antigravityTextTestMessage(prompt string) string {
+	if prompt = strings.TrimSpace(prompt); prompt != "" {
+		return prompt
+	}
+	return antigravityTextTestPrompt
+}
+
 func shouldUseAntigravityGeminiTestRequest(_, mappedModel string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(mappedModel)), "gemini-")
 }
@@ -396,7 +408,7 @@ func (s *AntigravityGatewayService) TestConnectionWithPrompt(ctx context.Context
 	if shouldUseAntigravityGeminiTestRequest(modelID, mappedModel) {
 		requestBody, err = s.buildGeminiTestRequestWithPrompt(projectID, mappedModel, prompt)
 	} else {
-		requestBody, err = s.buildClaudeTestRequest(projectID, mappedModel)
+		requestBody, err = s.buildClaudeTestRequest(projectID, mappedModel, prompt)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("构建请求失败: %w", err)
@@ -451,6 +463,9 @@ func (s *AntigravityGatewayService) TestConnectionWithPrompt(ctx context.Context
 	}
 
 	text, images := extractContentFromSSEResponse(respBody)
+	if strings.TrimSpace(text) == "" && len(images) == 0 {
+		return nil, errors.New("上游未返回文本或图片，可能达到输出上限或被内容策略拦截，请重试或更换模型")
+	}
 	return &TestConnectionResult{Text: text, Images: images, MappedModel: mappedModel}, nil
 }
 
@@ -468,7 +483,7 @@ func testConnectionHandleError(
 }
 
 // buildGeminiTestRequestWithPrompt 构建 Gemini 格式测试请求
-// 文本模型使用最小 token 消耗：输入 "." + maxOutputTokens: 1；图片模型使用图片生成配置
+// 文本模型请求简短确认，并为思考和可见回答留出输出空间；图片模型使用图片生成配置。
 func (s *AntigravityGatewayService) buildGeminiTestRequestWithPrompt(projectID, model, prompt string) ([]byte, error) {
 	if isImageGenerationModel(model) {
 		imagePrompt := strings.TrimSpace(prompt)
@@ -505,7 +520,7 @@ func (s *AntigravityGatewayService) buildGeminiTestRequestWithPrompt(projectID, 
 			{
 				"role": "user",
 				"parts": []map[string]any{
-					{"text": "."},
+					{"text": antigravityTextTestMessage(prompt)},
 				},
 			},
 		},
@@ -516,7 +531,7 @@ func (s *AntigravityGatewayService) buildGeminiTestRequestWithPrompt(projectID, 
 			},
 		},
 		"generationConfig": map[string]any{
-			"maxOutputTokens": 1,
+			"maxOutputTokens": antigravityTextTestMaxTokens,
 		},
 		"toolConfig": map[string]any{
 			"functionCallingConfig": map[string]any{
@@ -529,17 +544,21 @@ func (s *AntigravityGatewayService) buildGeminiTestRequestWithPrompt(projectID, 
 }
 
 // buildClaudeTestRequest 构建 Claude 格式测试请求并转换为 Gemini 格式
-// 使用最小 token 消耗：输入 "." + MaxTokens: 1
-func (s *AntigravityGatewayService) buildClaudeTestRequest(projectID, mappedModel string) ([]byte, error) {
+// 使用简短确认提示词，并为模型生成可见回答保留足够的输出空间。
+func (s *AntigravityGatewayService) buildClaudeTestRequest(projectID, mappedModel, prompt string) ([]byte, error) {
+	message, err := json.Marshal(antigravityTextTestMessage(prompt))
+	if err != nil {
+		return nil, err
+	}
 	claudeReq := &antigravity.ClaudeRequest{
 		Model: mappedModel,
 		Messages: []antigravity.ClaudeMessage{
 			{
 				Role:    "user",
-				Content: json.RawMessage(`"."`),
+				Content: message,
 			},
 		},
-		MaxTokens: 1,
+		MaxTokens: antigravityTextTestMaxTokens,
 		Stream:    false,
 	}
 	return antigravity.TransformClaudeToGemini(claudeReq, projectID, mappedModel)
